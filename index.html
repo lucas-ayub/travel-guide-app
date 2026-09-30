@@ -405,7 +405,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=10"></script>
+<script src="config.js?v=11"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -635,7 +635,9 @@ async function commonsFiles(params){
       src:ii.thumburl||ii.url,page:ii.descriptionurl,by:stripHtml(md.Artist?.value).slice(0,80),lic:stripHtml(md.LicenseShortName?.value)}}).filter(Boolean);
 }
 const isPhoto=f=>/jpeg|webp/.test(f.mime)&&!NOT_PHOTO.test(f.title.replace(/[_\-.,()]/g,' '));
-const goodPhoto=f=>isPhoto(f)&&f.w>=800&&f.h>=500&&f.w/f.h>=0.55&&f.w/f.h<=2.4&&!(f.year&&f.year<1960);
+// An old year in the file name (e.g. "…, 1859.jpg") usually means a painting or archive photo.
+const oldByName=t=>/\b(1[5-8]\d\d|19[0-5]\d)\b/.test(t)&&!/\b(19[6-9]\d|20\d\d)\b/.test(t);
+const goodPhoto=f=>isPhoto(f)&&f.w>=800&&f.h>=500&&f.w/f.h>=0.55&&f.w/f.h<=2.4&&!(f.year&&f.year<1960)&&!oldByName(f.title);
 const LANGS=['de','fr','es','it','nl','sv','da','nb','pt','pl','ja','ru','fi','ca','cs','zh','uk','hu','ko','tr'];
 // Rank the images of a Wikipedia article by how many language editions use them:
 // the photo most editors picked for the article is the iconic view of the place.
@@ -693,7 +695,7 @@ const infoKey=p=>`${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}|${p.wiki||''}|${
 const pending=new Map(),queue=[];let running=0;
 function ensureInfo(p){const k=infoKey(p);if(INFO[k])return Promise.resolve(INFO[k]);if(pending.has(k))return pending.get(k);const pr=new Promise(res=>queue.push({p,k,res}));pending.set(k,pr);pump();return pr}
 function pump(){
-  while(running<2&&queue.length){
+  while(running<3&&queue.length){
     const{p,k,res}=queue.shift();running++;
     (async()=>{
       let out={photos:[],extract:'',title:''},ok=false;
