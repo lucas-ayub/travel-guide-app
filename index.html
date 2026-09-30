@@ -405,7 +405,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=12"></script>
+<script src="config.js?v=13"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -484,7 +484,7 @@ let user=null;                 // {id,email,name}
 let S=null;                    // {trips,current,prefs}
 let tab='trips', filter='all', selected=null;
 const keyFor=u=>'atlas.v2.'+(u?u.id:'guest');
-let INFO=load('atlas.info.v4')||{};
+let INFO=load('atlas.info.v5')||{};
 
 const roleOf=t=>(!user||!t)?'owner':(S.roles?.[t.id]||'owner');
 const canEdit=t=>roleOf(t)!=='viewer';
@@ -699,6 +699,20 @@ async function openversePhotos(p,city){
   }
   return out;
 }
+// Colourfulness (Hasler & Süsstrunk) of a small thumbnail. Drawings, engravings and
+// black-and-white archive photos score near zero. Unknown (e.g. no CORS) counts as colourful.
+function colourful(src){
+  return new Promise(res=>{
+    if(!src)return res(99);const img=new Image();img.crossOrigin='anonymous';
+    const t=setTimeout(()=>res(99),6000);
+    img.onload=()=>{clearTimeout(t);try{const c=document.createElement('canvas');c.width=48;c.height=36;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,48,36);
+      const d=x.getImageData(0,0,48,36).data;let n=0,srg=0,syb=0,ssrg=0,ssyb=0;
+      for(let i=0;i<d.length;i+=4){const rg=d[i]-d[i+1],yb=(d[i]+d[i+1])/2-d[i+2];srg+=rg;syb+=yb;ssrg+=rg*rg;ssyb+=yb*yb;n++}
+      const mrg=srg/n,myb=syb/n,sd=Math.sqrt(Math.max(0,ssrg/n-mrg*mrg)+Math.max(0,ssyb/n-myb*myb)),mean=Math.sqrt(mrg*mrg+myb*myb);
+      res(sd+0.3*mean)}catch(e){res(99)}};
+    img.onerror=()=>{clearTimeout(t);res(99)};img.src=src;
+  });
+}
 async function findPhotos(p,art){
   const [city,w]=await Promise.all([cityOf(p),wikimediaPhotos(p,art)]);
   let ov=[];try{ov=await openversePhotos(p,city)}catch(e){if(!w.length)throw e}
@@ -707,7 +721,9 @@ async function findPhotos(p,art){
   const out=[],take=(a,n)=>{for(let i=0;i<n&&a.length;i++)out.push(a.shift())};
   const A=[...ov],B=[...wm];
   take(A,2);take(B,1);take(A,2);take(B,1);take(A,2);take(B,2);take(A,4);take(B,4);
-  return out.slice(0,10);
+  const cand=out.slice(0,12);
+  const scores=await Promise.all(cand.map(ph=>colourful(thumbOf(ph,330))));
+  return cand.filter((ph,i)=>scores[i]>=14).slice(0,10);
 }
 const infoKey=p=>`${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}|${p.wiki||''}|${p.name}`;
 const pending=new Map(),queue=[];let running=0;
@@ -720,7 +736,7 @@ function pump(){
       try{
         const art=await findArticle(p);
         const photos=await findPhotos(p,art);
-        out={photos,extract:art?.extract||'',title:art?.title||''};INFO[k]=out;store('atlas.info.v4',INFO);ok=true;
+        out={photos,extract:art?.extract||'',title:art?.title||''};INFO[k]=out;store('atlas.info.v5',INFO);ok=true;
       }catch(e){}
       pending.delete(k);running--;res(out);pump();if(ok)onInfo(p);
     })();
