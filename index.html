@@ -112,6 +112,7 @@ body.sheet-open .sheet{height:50vh}
 .slide .bg{position:absolute;inset:-30px;background:center/cover no-repeat;filter:blur(22px) brightness(.62) saturate(1.2)}
 .slide img{position:relative;width:100%;height:100%;object-fit:contain;display:block}
 .slide.cover img{object-fit:cover}
+.near-tag{position:absolute;left:14px;top:14px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px}
 .hero-photo .zoom-hint{position:absolute;left:14px;bottom:14px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;display:flex;gap:5px;align-items:center;pointer-events:none}
 .hero-photo .zoom-hint svg{width:13px;height:13px}
 /* full-screen viewer */
@@ -405,7 +406,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=14"></script>
+<script src="config.js?v=15"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -484,7 +485,7 @@ let user=null;                 // {id,email,name}
 let S=null;                    // {trips,current,prefs}
 let tab='trips', filter='all', selected=null;
 const keyFor=u=>'atlas.v2.'+(u?u.id:'guest');
-let INFO=load('atlas.info.v5')||{};
+let INFO=load('atlas.info.v6')||{};
 
 const roleOf=t=>(!user||!t)?'owner':(S.roles?.[t.id]||'owner');
 const canEdit=t=>roleOf(t)!=='viewer';
@@ -618,6 +619,16 @@ async function findArticle(p){
   let best=null,bs=0;for(const h of(g?.query?.geosearch||[])){const sc=similar(p.name,h.title);if(sc>bs){bs=sc;best=h}}
   return best?wpPage(best.title):null;
 }
+/* ---------- Photo sources, in order of priority (all free, no keys) ----------
+   1. Traveller photos (Flickr etc. via Openverse), searched by name + city
+   2. Encyclopedia photos: the Wikidata image and the photos most Wikipedia languages use
+   3. Traveller photos under the place's other names (Wikipedia title, local-language names)
+   4. The place's own Wikimedia Commons category
+   5. Photos taken at the spot whose file name names the place
+   6. Photos of the immediate surroundings, marked "Nearby"
+   Lower tiers only run while fewer than PHOTO_TARGET good photos have been found.
+   Every photo passes the same checks: real photo, big enough, sensible shape, in colour. */
+const PHOTO_TARGET=6,PHOTO_MAX=10;
 async function wikidata(qid){
   const j=await q('https://www.wikidata.org/w/api.php',{action:'wbgetentities',ids:qid,props:'claims'});
   const c=j?.entities?.[qid]?.claims||{};const v=x=>x?.mainsnak?.datavalue?.value;
@@ -632,45 +643,46 @@ async function commonsFiles(params){
   return pages.map(pg=>{const ii=pg.imageinfo?.[0];if(!ii)return null;const md=ii.extmetadata||{};
     const yr=+(String(stripHtml(md.DateTimeOriginal?.value)).match(/\b(1[5-9]\d\d|20\d\d)\b/)?.[1]||0);
     return{title:(pg.title||'').replace(/^File:/,''),mime:ii.mime||'',w:ii.width||0,h:ii.height||0,tw:ii.thumbwidth||ii.width,th:ii.thumbheight||ii.height,year:yr,
-      src:ii.thumburl||ii.url,page:ii.descriptionurl,by:stripHtml(md.Artist?.value).slice(0,80),lic:stripHtml(md.LicenseShortName?.value)}}).filter(Boolean);
+      src:ii.thumburl||ii.url,page:ii.descriptionurl,by:stripHtml(md.Artist?.value).slice(0,80),lic:stripHtml(md.LicenseShortName?.value),via:'Wikimedia Commons'}}).filter(Boolean);
 }
 const isPhoto=f=>/jpeg|webp/.test(f.mime)&&!NOT_PHOTO.test(f.title.replace(/[_\-.,()]/g,' '));
 // An old year in the file name (e.g. "…, 1859.jpg") usually means a painting or archive photo.
 const oldByName=t=>/\b(1[5-8]\d\d|19[0-5]\d)\b/.test(t)&&!/\b(19[6-9]\d|20\d\d)\b/.test(t);
 const goodPhoto=f=>isPhoto(f)&&f.w>=800&&f.h>=500&&f.w/f.h>=0.55&&f.w/f.h<=2.4&&!(f.year&&f.year<1960)&&!oldByName(f.title);
 const LANGS=['de','fr','es','it','nl','sv','da','nb','pt','pl','ja','ru','fi','ca','cs','zh','uk','hu','ko','tr'];
-// Rank the images of a Wikipedia article by how many language editions use them:
-// the photo most editors picked for the article is the iconic view of the place.
-async function consensusFiles(enTitle){
-  const j=await q(WP,{action:'query',titles:enTitle,redirects:1,prop:'langlinks|images',lllimit:'max',imlimit:'max'});
+const NAME_LANGS=['da','sv','nb','de','fr','es','it','nl','pt'];
+// Rank the images of a Wikipedia article by how many language editions use them, and
+// collect the place's names in other languages for more searches.
+async function wikiBits(art){
+  const j=await q(WP,{action:'query',titles:art.title,redirects:1,prop:'langlinks|images',lllimit:'max',imlimit:'max'});
   const pg=Object.values(j?.query?.pages||{})[0]||{};
-  const links=(pg.langlinks||[]).filter(l=>LANGS.includes(l.lang)).slice(0,10);
+  const all=(pg.langlinks||[]);const links=all.filter(l=>LANGS.includes(l.lang)).slice(0,10);
   const counts=new Map();const bump=t=>{const f=t.replace(/^[^:]+:/,'').replace(/_/g,' ');if(/\.(jpe?g|webp)$/i.test(f))counts.set(f,(counts.get(f)||0)+1)};
   (pg.images||[]).forEach(i=>bump(i.title));
-  await Promise.all(links.map(async l=>{try{const r=await q(`https://${l.lang}.wikipedia.org/w/api.php`,{action:'query',titles:l['*'],redirects:1,prop:'images',imlimit:'max'});(Object.values(r?.query?.pages||{})[0]?.images||[]).forEach(i=>bump(i.title))}catch(e){}}));
-  return [...counts].sort((a,b)=>b[1]-a[1]).map(([f,c])=>({f,c}));
+  const [wd]=await Promise.all([art.qid?wikidata(art.qid).catch(()=>null):null,
+    ...links.map(async l=>{try{const r=await q(`https://${l.lang}.wikipedia.org/w/api.php`,{action:'query',titles:l['*'],redirects:1,prop:'images',imlimit:'max'});(Object.values(r?.query?.pages||{})[0]?.images||[]).forEach(i=>bump(i.title))}catch(e){}})]);
+  const names=[...new Set([art.title.replace(/\s*\(.*\)$/,''),...all.filter(l=>NAME_LANGS.includes(l.lang)).map(l=>l['*'].replace(/\s*\(.*\)$/,''))])];
+  return{cons:[...counts].sort((a,b)=>b[1]-a[1]).map(([f,c])=>({f,c})),lead:(wd?.images||[]).map(f=>f.replace(/_/g,' ')),cat:wd?.cat||'',names};
 }
-async function wikidata(qid){
-  const j=await q('https://www.wikidata.org/w/api.php',{action:'wbgetentities',ids:qid,props:'claims'});
-  const c=j?.entities?.[qid]?.claims||{};const v=x=>x?.mainsnak?.datavalue?.value;
-  return{images:(c.P18||[]).map(v).filter(Boolean)};
-}
-async function wikimediaPhotos(p,art){
-  if(!art){
-    // No article: only nearby photos whose file name names the place. Better none than random ones.
-    const near=await commonsFiles({generator:'geosearch',ggscoord:`${p.lat}|${p.lon}`,ggsradius:200,ggsnamespace:6,ggslimit:40});
-    return near.filter(goodPhoto).filter(f=>similar(p.name,f.title)>0).sort((a,b)=>similar(p.name,b.title)-similar(p.name,a.title)).slice(0,6);
-  }
-  const [cons,wd]=await Promise.all([consensusFiles(art.title),art.qid?wikidata(art.qid).catch(()=>null):null]);
-  const lead=(wd?.images||[]).map(f=>f.replace(/_/g,' '));
+async function encyclopediaPhotos(p,art,bits){
   const score=x=>x.c+(similar(p.name,x.f)||similar(art.title,x.f)?1.5:0);
-  const ranked=[...lead,...cons.filter(x=>x.c>=2||cons.length<6).sort((a,b)=>score(b)-score(a)).map(x=>x.f)].filter((f,i,a)=>a.indexOf(f)===i).slice(0,18);
+  const ranked=[...bits.lead,...bits.cons.filter(x=>x.c>=2||bits.cons.length<6).sort((a,b)=>score(b)-score(a)).map(x=>x.f)].filter((f,i,a)=>a.indexOf(f)===i).slice(0,18);
   if(!ranked.length)return [];
   const info=await commonsFiles({titles:ranked.map(f=>'File:'+f).join('|')});
   const byName=new Map(info.map(f=>[f.title,f]));
-  return ranked.map(f=>byName.get(f)).filter(Boolean).filter(goodPhoto).slice(0,8);
+  return ranked.map(f=>byName.get(f)).filter(Boolean).filter(goodPhoto);
 }
-// Free traveller photos from Flickr and others via Openverse (no key needed).
+async function categoryPhotos(cat){
+  if(!cat)return [];
+  const files=await commonsFiles({generator:'categorymembers',gcmtitle:'Category:'+cat,gcmtype:'file',gcmlimit:50});
+  return files.filter(goodPhoto).sort((a,b)=>b.w*b.h-a.w*a.h);
+}
+async function spotPhotos(p,names,strict){
+  const near=await commonsFiles({generator:'geosearch',ggscoord:`${p.lat}|${p.lon}`,ggsradius:strict?250:150,ggsnamespace:6,ggslimit:40});
+  const m=f=>Math.max(...names.map(n=>similar(n,f.title)));
+  const ok=near.filter(goodPhoto).filter(f=>strict?m(f)>0:true);
+  return ok.sort((a,b)=>m(b)-m(a)).map(f=>strict?f:{...f,nearby:true});
+}
 async function cityOf(p){
   try{const r=await(await fetch('https://photon.komoot.io/reverse?'+new URLSearchParams({lat:p.lat,lon:p.lon,lang:'en'}))).json();
     const pr=r.features?.[0]?.properties||{};return pr.city||pr.town||pr.village||pr.county||''}catch(e){return ''}
@@ -678,8 +690,8 @@ async function cityOf(p){
 const OV_BAD=/\b(map|plan|logo|drawing|painting|sketch|poster|lego|minifig|doll|toy|cosplay|costume|disney)\b/i;
 let ovGate=Promise.resolve();
 const ovTurn=()=>{const t=ovGate.then(()=>new Promise(r=>setTimeout(r,900)));ovGate=t;return t};
-async function openversePhotos(p,city){
-  const query=city&&!similar(p.name,city)&&!norm(p.name).includes(norm(city)[0])?`${p.name} ${city}`:p.name;
+// Openverse search; a result must mention one of the place's names in its title or tags.
+async function openverseSearch(query,names,placeName){
   let j;
   for(let i=0;i<3;i++){
     await ovTurn();
@@ -691,17 +703,18 @@ async function openversePhotos(p,city){
   const perCreator=new Map(),out=[];
   for(const r of j.results||[]){
     const text=[r.title,...(r.tags||[]).map(t=>t.name)].join(' ');
-    if(!similar(p.name,text))continue;                                 // must actually be about this place
-    if(OV_BAD.test(text)&&!OV_BAD.test(p.name))continue;                // skip toys, maps, costumes… unless that is the place
+    if(!names.some(n=>similar(n,text)))continue;
+    if(OV_BAD.test(text)&&!OV_BAD.test(placeName))continue;
     const w=r.width||0,hh=r.height||0;
     if(Math.max(w,hh)<800||(w&&hh&&(w/hh<0.55||w/hh>2.4)))continue;
     const c=(r.creator||'').toLowerCase();if((perCreator.get(c)||0)>=2)continue;perCreator.set(c,(perCreator.get(c)||0)+1);
+    const src=(r.source||r.provider||'').replace(/^./,x=>x.toUpperCase());
     out.push({src:r.url,thumb:r.thumbnail,page:r.foreign_landing_url||r.url,by:(r.creator||'').slice(0,60),
-      lic:r.license?`CC ${r.license.toUpperCase()} ${r.license_version||''}`.trim():'',tw:w,th:hh,id:'ov:'+r.id});
-    if(out.length>=8)break;
+      lic:r.license?`CC ${r.license.toUpperCase()} ${r.license_version||''}`.trim():'',tw:w,th:hh,id:'ov:'+r.id,via:src?`${src} via Openverse`:'Openverse'});
   }
   return out;
 }
+const withCity=(name,city)=>city&&!similar(name,city)&&!norm(name).includes(norm(city)[0])?`${name} ${city}`:name;
 // Colourfulness (Hasler & Süsstrunk) of a small thumbnail. Drawings, engravings and
 // black-and-white archive photos score near zero. Unknown (e.g. no CORS) counts as colourful.
 function colourful(src){
@@ -717,16 +730,36 @@ function colourful(src){
   });
 }
 async function findPhotos(p,art){
-  const [city,w]=await Promise.all([cityOf(p),wikimediaPhotos(p,art)]);
-  let ov=[],partial=false;try{ov=await openversePhotos(p,city)}catch(e){if(!w.length)throw e;partial=true}
-  const wm=w.map(({title,mime,w,h,year,...f})=>({...f,id:title||f.src}));
-  // Mix: the best traveller shots first, with the official and most-used encyclopedia photos woven in.
-  const out=[],take=(a,n)=>{for(let i=0;i<n&&a.length;i++)out.push(a.shift())};
-  const A=[...ov],B=[...wm];
+  const good=[],seen=new Set();let partial=false;
+  const tidy=({title,mime,w,h,year,...f})=>({...f,id:f.id||title||f.src});
+  async function accept(list,tier){
+    const fresh=[];for(const ph of list.map(tidy)){if(seen.has(ph.id))continue;seen.add(ph.id);fresh.push(ph);if(fresh.length>=PHOTO_MAX)break}
+    const scores=await Promise.all(fresh.map(ph=>colourful(thumbOf(ph,330))));
+    fresh.forEach((ph,i)=>{if(scores[i]>=14&&good.length<PHOTO_MAX)good.push({...ph,tier})});
+  }
+  const need=()=>good.length<PHOTO_TARGET;
+  const [city,bits]=await Promise.all([cityOf(p),art?wikiBits(art):null]);
+  const names=[p.name,...(bits?.names||[])];
+  // Tiers 1 + 2, woven together: the best traveller shots first, encyclopedia photos in between.
+  const [ov,enc]=await Promise.all([
+    openverseSearch(withCity(p.name,city),[p.name],p.name).catch(()=>{partial=true;return []}),
+    art?encyclopediaPhotos(p,art,bits):Promise.resolve([])]);
+  const mix=[],A=[...ov],B=[...enc],take=(a,n)=>{for(let i=0;i<n&&a.length;i++)mix.push(a.shift())};
   take(A,2);take(B,1);take(A,2);take(B,1);take(A,2);take(B,2);take(A,4);take(B,4);
-  const cand=out.slice(0,12);
-  const scores=await Promise.all(cand.map(ph=>colourful(thumbOf(ph,330))));
-  const photos=cand.filter((ph,i)=>scores[i]>=14).slice(0,10);photos.partial=partial;return photos;
+  await accept(mix,1);
+  // Tier 3: other names (Wikipedia title, Danish/Swedish/German… names)
+  if(need()&&!partial){
+    const alt=names.slice(1).filter(n=>!similar(n,p.name)||norm(n).join(' ')!==norm(p.name).join(' ')).slice(0,2);
+    for(const n of alt){if(!need())break;try{await accept(await openverseSearch(withCity(n,city),names,p.name),3)}catch(e){partial=true;break}}
+  }
+  // Tier 4: the place's Commons category
+  if(need()&&bits?.cat) await accept(await categoryPhotos(bits.cat).catch(()=>[]),4);
+  // Tier 5: photos at the spot that name the place
+  if(need()) await accept(await spotPhotos(p,names,true).catch(()=>[]),5);
+  // Tier 6: the surroundings, clearly marked
+  if(good.length<3) await accept(await spotPhotos(p,names,false).catch(()=>[]),6);
+  if(!good.length&&partial)throw new Error('sources unavailable');
+  good.partial=partial;return good;
 }
 const infoKey=p=>`${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}|${p.wiki||''}|${p.name}`;
 const pending=new Map(),queue=[];let running=0;
@@ -739,7 +772,7 @@ function pump(){
       try{
         const art=await findArticle(p);
         const photos=await findPhotos(p,art);
-        out={photos:[...photos],extract:art?.extract||'',title:art?.title||'',...(photos.partial?{partial:Date.now()}:{})};INFO[k]=out;store('atlas.info.v5',INFO);ok=true;
+        out={photos:[...photos],extract:art?.extract||'',title:art?.title||'',...(photos.partial?{partial:Date.now()}:{})};INFO[k]=out;store('atlas.info.v6',INFO);ok=true;
       }catch(e){}
       pending.delete(k);running--;res(out);pump();if(ok)onInfo(p);
     })();
@@ -855,7 +888,7 @@ function renderDetail(p){
   const t=trip(),g=groupOf(t,p),inf=INFO[infoKey(p)],name=encodeURIComponent(p.name);
   const boxR=Math.min(innerWidth,700)/Math.min(300,innerHeight*0.38),phs=inf?photosOf(p):[];
   const photos=inf?(phs.length?phs.map((ph,i)=>{const r=ph.tw&&ph.th?ph.tw/ph.th:boxR;const cover=Math.abs(r-boxR)/boxR<0.3;
-      return `<button class="slide${cover?' cover':''}" data-ph="${i}" aria-label="Open photo ${i+1}"><span class="bg" style="background-image:url('${esc(thumbOf(ph,330))}')"></span><img src="${esc(ph.src)}" alt="${esc(p.name)}" ${i?'loading="lazy"':''}></button>`}).join('')
+      return `<button class="slide${cover?' cover':''}" data-ph="${i}" aria-label="Open photo ${i+1}"><span class="bg" style="background-image:url('${esc(thumbOf(ph,330))}')"></span><img src="${esc(ph.src)}" alt="${esc(p.name)}" ${i?'loading="lazy"':''}>${ph.nearby?'<span class="near-tag">Nearby</span>':''}</button>`}).join('')
     :`<div class="ph" style="flex-direction:column;gap:6px;text-align:center;padding:0 24px"><b style="color:var(--ink)">No good photos found</b><span>Try a more specific name, or add the English Wikipedia title in Edit place.</span></div>`):`<div class="ph">Loading photos…</div>`;
   $('#detailScroll').innerHTML=`
     <div class="hero-photo"><div class="strip" id="strip">${photos}</div>${phs.length?`<span class="zoom-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Tap to view</span>`:''}${phs.length>1?`<span class="count" id="phCount">1 / ${phs.length}</span>`:''}</div>
@@ -888,7 +921,7 @@ function openViewer(photos,i,place){
 }
 function lbIndex(){const s=$('#lbStrip');return Math.round(s.scrollLeft/Math.max(1,s.clientWidth))}
 function lbInfo(i){const ph=lbPhotos[i]||{};$('#lbCount').textContent=`${i+1} / ${lbPhotos.length}`;
-  $('#lbCredit').textContent=[ph.by&&('Photo: '+ph.by),ph.lic].filter(Boolean).join(' · ')||'Open licence photo';$('#lbSrc').href=ph.page||'#'}
+  $('#lbCredit').textContent=[ph.nearby&&'Nearby',ph.by&&('Photo: '+ph.by),ph.lic,ph.via].filter(Boolean).join(' · ')||'Open licence photo';$('#lbSrc').href=ph.page||'#'}
 $('#lbStrip').addEventListener('scroll',()=>lbInfo(lbIndex()),{passive:true});
 $('#lbClose').onclick=()=>{$('#lb').hidden=true;$('#lbStrip').innerHTML=''};
 $('#lbCover').onclick=()=>{const p=lbPlace,ph=lbPhotos[lbIndex()];if(!p||!ph)return;p.coverPhoto=ph.id||ph.src;touch(trip());$('#lbClose').click();renderDetail(p);renderList();renderHub();toast('Cover photo set')};
