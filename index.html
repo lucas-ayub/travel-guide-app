@@ -100,10 +100,10 @@ body.sheet-open .sheet{height:50vh}
 .empty{padding:22px 16px;color:var(--muted);text-align:center}
 
 /* place card */
-.detail{position:fixed;left:0;right:0;bottom:0;z-index:40;height:88vh;background:var(--surface);border-radius:24px 24px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.3);transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+.detail{position:fixed;left:0;right:0;bottom:var(--tabh);z-index:40;height:calc(100vh - var(--tabh) - var(--st) - 74px);background:var(--surface);border-radius:24px 24px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.3);transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
 .detail.show{transform:none}
-.detail .scroll{overflow-y:auto;flex:1;padding-bottom:calc(var(--sb) + 24px);-webkit-overflow-scrolling:touch}
-.hero-photo{position:relative;height:300px;background:var(--surface-2);border-radius:24px 24px 0 0;overflow:hidden}
+.detail .scroll{overflow-y:auto;flex:1;padding-bottom:24px;-webkit-overflow-scrolling:touch}
+.hero-photo{position:relative;height:min(300px,38vh);background:var(--surface-2);border-radius:24px 24px 0 0;overflow:hidden}
 .hero-photo .strip{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
 .hero-photo .strip::-webkit-scrollbar{display:none}
 .hero-photo a{flex:none;width:100%;height:100%;scroll-snap-align:center;display:block}
@@ -133,6 +133,7 @@ body.sheet-open .sheet{height:50vh}
 .panel{position:fixed;inset:0;z-index:30;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--st) + 14px) 18px calc(var(--tabh) + 28px);display:none}
 body[data-tab="trips"] #view-trips,body[data-tab="account"] #view-account{display:block}
 .wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.stack{display:flex;flex-direction:column;gap:12px}
 .brand{display:flex;align-items:center;gap:10px}
 .brand img{width:36px;height:36px;border-radius:10px}
 .brand b{font:800 20px/1 var(--display);letter-spacing:-.02em}
@@ -263,12 +264,12 @@ textarea{min-height:84px;resize:vertical}
     <div class="brand"><img src="logo.svg" alt=""><b>Trip Atlas</b><span class="grow"></span><button class="avatar" id="hubAvatar" aria-label="Account">?</button></div>
     <div class="greet"><h1 id="greet">Where to next?</h1><p id="greetSub"></p></div>
     <div id="heroSlot"></div>
-    <section class="wrap" style="gap:12px" id="upSec">
+    <section class="stack" id="upSec">
       <div class="sec-h"><h3>Your trips</h3><button id="importBtn2">Import</button></div>
       <div class="cards" id="tripCards"></div>
       <button class="new-trip" id="newTripBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Plan a new trip</button>
     </section>
-    <section class="wrap" style="gap:12px" id="pastSec" hidden>
+    <section class="stack" id="pastSec" hidden>
       <div class="sec-h"><h3>Past trips</h3></div>
       <div class="cards" id="pastCards"></div>
     </section>
@@ -844,13 +845,13 @@ function renderAccount(){
   } else if(!user){
     html+=`<div class="card"><h3>${authStep==='email'?'Sign in or create an account':'Check your email'}</h3>
       ${authStep==='email'?`<p>We'll email you a 6-digit code. No password needed.</p>
-        <form id="authForm" class="wrap" style="gap:12px">
+        <form id="authForm" class="stack">
           <label class="f">Name<input type="text" id="aName" autocomplete="name" value="${esc(authName)}" placeholder="Your name"></label>
           <label class="f">Email<input type="email" id="aEmail" autocomplete="email" required value="${esc(authEmail)}" placeholder="you@example.com"></label>
           ${authErr?`<p class="err-msg">${esc(authErr)}</p>`:''}
           <button class="btn primary" ${authBusy?'disabled':''}>${authBusy?'Sending…':'Send code'}</button></form>`
       :`<p>We sent a 6-digit code to <b>${esc(authEmail)}</b>. Type it below.</p>
-        <form id="codeForm" class="wrap" style="gap:12px">
+        <form id="codeForm" class="stack">
           <input class="code" type="text" id="aCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
           ${authErr?`<p class="err-msg">${esc(authErr)}</p>`:''}
           <button class="btn primary" ${authBusy?'disabled':''}>${authBusy?'Checking…':'Sign in'}</button>
