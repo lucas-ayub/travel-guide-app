@@ -405,7 +405,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=13"></script>
+<script src="config.js?v=14"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -676,14 +676,17 @@ async function cityOf(p){
     const pr=r.features?.[0]?.properties||{};return pr.city||pr.town||pr.village||pr.county||''}catch(e){return ''}
 }
 const OV_BAD=/\b(map|plan|logo|drawing|painting|sketch|poster|lego|minifig|doll|toy|cosplay|costume|disney)\b/i;
+let ovGate=Promise.resolve();
+const ovTurn=()=>{const t=ovGate.then(()=>new Promise(r=>setTimeout(r,900)));ovGate=t;return t};
 async function openversePhotos(p,city){
   const query=city&&!similar(p.name,city)&&!norm(p.name).includes(norm(city)[0])?`${p.name} ${city}`:p.name;
   let j;
   for(let i=0;i<3;i++){
-    const r=await fetch('https://api.openverse.org/v1/images/?'+new URLSearchParams({q:query,page_size:30,mature:'false'}));
+    await ovTurn();
+    let r;try{r=await fetch('https://api.openverse.org/v1/images/?'+new URLSearchParams({q:query,page_size:30,mature:'false'}))}catch(e){r={ok:false,status:429}}
     if(r.ok){j=await r.json();break}
     if(i===2||(r.status!==429&&r.status<500))throw new Error('openverse '+r.status);
-    await new Promise(res=>setTimeout(res,1500*(i+1)));
+    await new Promise(res=>setTimeout(res,4000*(i+1)));
   }
   const perCreator=new Map(),out=[];
   for(const r of j.results||[]){
@@ -715,7 +718,7 @@ function colourful(src){
 }
 async function findPhotos(p,art){
   const [city,w]=await Promise.all([cityOf(p),wikimediaPhotos(p,art)]);
-  let ov=[];try{ov=await openversePhotos(p,city)}catch(e){if(!w.length)throw e}
+  let ov=[],partial=false;try{ov=await openversePhotos(p,city)}catch(e){if(!w.length)throw e;partial=true}
   const wm=w.map(({title,mime,w,h,year,...f})=>({...f,id:title||f.src}));
   // Mix: the best traveller shots first, with the official and most-used encyclopedia photos woven in.
   const out=[],take=(a,n)=>{for(let i=0;i<n&&a.length;i++)out.push(a.shift())};
@@ -723,11 +726,11 @@ async function findPhotos(p,art){
   take(A,2);take(B,1);take(A,2);take(B,1);take(A,2);take(B,2);take(A,4);take(B,4);
   const cand=out.slice(0,12);
   const scores=await Promise.all(cand.map(ph=>colourful(thumbOf(ph,330))));
-  return cand.filter((ph,i)=>scores[i]>=14).slice(0,10);
+  const photos=cand.filter((ph,i)=>scores[i]>=14).slice(0,10);photos.partial=partial;return photos;
 }
 const infoKey=p=>`${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}|${p.wiki||''}|${p.name}`;
 const pending=new Map(),queue=[];let running=0;
-function ensureInfo(p){const k=infoKey(p);if(INFO[k])return Promise.resolve(INFO[k]);if(pending.has(k))return pending.get(k);const pr=new Promise(res=>queue.push({p,k,res}));pending.set(k,pr);pump();return pr}
+function ensureInfo(p){const k=infoKey(p);if(INFO[k]&&!(INFO[k].partial&&Date.now()-INFO[k].partial>15*60e3))return Promise.resolve(INFO[k]);if(pending.has(k))return pending.get(k);const pr=new Promise(res=>queue.push({p,k,res}));pending.set(k,pr);pump();return pr}
 function pump(){
   while(running<3&&queue.length){
     const{p,k,res}=queue.shift();running++;
@@ -736,7 +739,7 @@ function pump(){
       try{
         const art=await findArticle(p);
         const photos=await findPhotos(p,art);
-        out={photos,extract:art?.extract||'',title:art?.title||''};INFO[k]=out;store('atlas.info.v5',INFO);ok=true;
+        out={photos:[...photos],extract:art?.extract||'',title:art?.title||'',...(photos.partial?{partial:Date.now()}:{})};INFO[k]=out;store('atlas.info.v5',INFO);ok=true;
       }catch(e){}
       pending.delete(k);running--;res(out);pump();if(ok)onInfo(p);
     })();
