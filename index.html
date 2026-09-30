@@ -55,6 +55,8 @@ body.sheet-open .maplibregl-ctrl-bottom-right{bottom:calc(var(--tabh) + 50vh)}
 .pin b{position:absolute;left:0;right:0;top:8px;text-align:center;color:#fff;font:700 12.5px/1 var(--body);font-variant-numeric:tabular-nums}
 .pin.sel{z-index:5}
 .pin.sel .in{transform:scale(1.3)}
+.pin i{position:absolute;left:0;right:0;top:6px;display:grid;place-items:center;color:#fff}
+.pin i svg{position:static;width:15px;height:15px}
 .me{width:20px;height:20px;border-radius:50%;background:#2F7DE1;border:3px solid #fff;box-shadow:0 0 0 0 rgba(47,125,225,.5);animation:pulse 2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,125,225,.45)}70%{box-shadow:0 0 0 16px rgba(47,125,225,0)}100%{box-shadow:0 0 0 0 rgba(47,125,225,0)}}
 
@@ -75,6 +77,8 @@ body[data-tab="map"] .map-ui{display:block}
 .chip{flex:none;border:0;border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;white-space:nowrap;box-shadow:var(--shadow-s)}
 .chip i{width:9px;height:9px;border-radius:50%;background:var(--c)}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.chip svg{width:14px;height:14px;color:var(--good)}
+.chip[aria-pressed="true"] svg{color:inherit}
 .fabs{position:fixed;right:12px;z-index:18;display:flex;flex-direction:column;gap:10px;bottom:calc(var(--tabh) + 96px - var(--gap,0px));transition:bottom .28s}
 body.sheet-open .fabs{bottom:calc(var(--tabh) + 50vh + 12px - var(--gap,0px))}
 .fab{width:52px;height:52px;border-radius:18px;border:0;display:grid;place-items:center}
@@ -93,6 +97,12 @@ body.sheet-open .sheet{height:50vh}
 .list{list-style:none;margin:0;padding:0 8px 12px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
 .item{display:flex;gap:12px;padding:9px 8px;border-radius:16px;align-items:center}
 .item:active{background:var(--surface-2)}
+.item.leaving{opacity:0;transform:translateX(28px);transition:opacity .22s,transform .22s}
+/* round tick on the right of a place: tap to mark it visited */
+.tick{flex:none;width:44px;height:44px;margin:-6px -4px -6px 0;padding:0;border:0;background:none;display:grid;place-items:center}
+.tick span{width:26px;height:26px;border-radius:50%;border:2px solid color-mix(in srgb,var(--muted) 55%,transparent);display:grid;place-items:center;color:transparent;transition:background .15s,border-color .15s,color .15s}
+.tick svg{width:14px;height:14px}
+.tick.on span{background:var(--good);border-color:var(--good);color:#fff}
 .thumb{width:64px;height:64px;border-radius:14px;flex:none;background:var(--surface-2) center/cover no-repeat;display:grid;place-items:center;font:700 20px var(--display);color:var(--muted);position:relative}
 .thumb .n{position:absolute;left:-5px;top:-5px;min-width:22px;height:22px;border-radius:11px;background:var(--c);color:#fff;font:700 12px/18px var(--body);text-align:center;padding:0 5px;border:2px solid var(--surface)}
 .meta{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
@@ -144,6 +154,8 @@ body.sheet-open .sheet{height:50vh}
 .d-tags{display:flex;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);align-items:center;font-variant-numeric:tabular-nums}
 .tag{display:inline-flex;gap:6px;align-items:center;background:var(--surface-2);border-radius:999px;padding:5px 11px;color:var(--ink);font-weight:600}
 .tag i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.tag svg{width:13px;height:13px}
+.tag.done{color:var(--good)}
 .note-box{white-space:pre-wrap;background:var(--surface-2);border-radius:14px;padding:12px 14px;border-left:3px solid var(--c)}
 .extract{color:var(--muted);font-size:14.5px;line-height:1.55}
 .extract a,.credit a,.link{color:var(--accent);text-decoration:none;font-weight:600}
@@ -152,6 +164,9 @@ body.sheet-open .sheet{height:50vh}
 .btn svg{width:18px;height:18px;flex:none}
 .btn.primary{background:linear-gradient(160deg,var(--accent-2),var(--accent));color:#fff}
 .btn.danger{color:var(--accent)}
+.btn.visit{color:var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--good) 45%,transparent)}
+.btn.visit.on{background:color-mix(in srgb,var(--good) 16%,transparent);box-shadow:none}
+.btn.visit small{font-size:13px;font-weight:600;opacity:.75}
 .btn.wide{grid-column:1/-1}
 .btn:disabled{opacity:.5}
 .credit{font-size:12px;color:var(--muted)}
@@ -282,6 +297,8 @@ textarea{min-height:84px;resize:vertical}
 .seg button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .toast{position:fixed;left:50%;top:calc(var(--st) + 14px);transform:translate(-50%,-12px);z-index:90;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:14px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.22s;max-width:calc(100vw - 32px);text-align:center;box-shadow:var(--shadow)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.act{pointer-events:auto}
+.toast button{border:0;background:none;color:var(--accent-2);font-weight:700;padding:0 0 0 12px}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -443,7 +460,8 @@ const ICON={
   nav:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>',
   apple:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4z"/></svg>',
   clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
-  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>'
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
 };
 const AV_COLORS=['#1A73E8','#D93025','#188038','#E37400','#9334E6','#12A4AF','#E52592','#A142F4','#F4511E','#0B8043','#3F51B5','#795548'];
 function avColor(s){let x=0;for(const c of String(s||''))x=(x*31+c.codePointAt(0))>>>0;return AV_COLORS[x%AV_COLORS.length]}
@@ -455,7 +473,10 @@ function paintAvatars(){
   else{hub.className='avatar guest';hub.style.removeProperty('--av');hub.innerHTML=PERSON}
   $('#tabAv').innerHTML=user?`<span class="avatar tab-av" style="--av:${avColor(user.email)}">${esc(initial(user))}</span>`:PERSON;
 }
-let tt;function toast(m){const el=$('#toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3200)}
+let tt;function toast(m,act){
+  const el=$('#toast');el.textContent=m;el.classList.toggle('act',!!act);
+  if(act){const b=document.createElement('button');b.textContent=act.label;b.onclick=()=>{clearTimeout(tt);el.classList.remove('show','act');act.fn()};el.appendChild(b)}
+  el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show','act'),act?5000:3200)}
 
 /* ================= Seed trip ================= */
 function P(group,name,lat,lon,note,wiki){return{id:uid(),group,name,lat,lon,note:note||'',wiki:wiki||''}}
@@ -499,7 +520,7 @@ function blankTrip(name,start,end){return{id:uid(),name,start:start||'',end:end|
 
 /* ================= State ================= */
 const CFG=window.ATLAS_CONFIG||{};
-const BUILD='1 Oct 2026';
+const BUILD='1 Oct 2026, 01:54';
 const HAS_AUTH=!!(CFG.supabaseUrl&&CFG.supabaseAnonKey);
 /* Where the sign-in lives. "Keep me signed in" on: localStorage, which survives closing the app.
    Off: sessionStorage, which the phone clears when the app is closed. */
@@ -606,7 +627,18 @@ function applyStyle(){const n=styleName();if(map&&n!==currentStyle){currentStyle
 darkMq.addEventListener?.('change',applyStyle);
 
 const markers=new Map();
-function visiblePlaces(){const t=trip();return t?t.places.filter(p=>filter==='all'||p.group===filter):[]}
+function visiblePlaces(){const t=trip();if(!t)return[];
+  if(filter==='visited')return t.places.filter(p=>p.visited);
+  return t.places.filter(p=>!p.visited&&(filter==='all'||p.group===filter))}
+const fmtWhen=ts=>new Date(ts).toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+function setVisited(p,on,quiet){
+  const t=trip();if(!t||!canEdit(t))return;
+  if(on){p.visited=true;p.visitedAt=Date.now()}else{delete p.visited;delete p.visitedAt}
+  touch(t);
+  if(filter==='visited'&&!t.places.some(x=>x.visited))filter='all';
+  renderTripUI();if(selected===p.id)renderDetail(p);
+  if(!quiet)toast(on?`${p.name} marked as visited`:`${p.name} is back on your list`,{label:'Undo',fn:()=>setVisited(p,!on,true)});
+}
 function orderIndex(t,p){return t.places.filter(q=>q.group===p.group).indexOf(p)+1}
 function renderMarkers(){
   for(const m of markers.values()) m.remove(); markers.clear();
@@ -614,8 +646,8 @@ function renderMarkers(){
   for(const p of visiblePlaces()){
     const g=groupOf(t,p);
     const el=document.createElement('div');
-    el.className='pin'+(p.id===selected?' sel':''); el.title=p.name;
-    el.innerHTML=`<div class="in"><svg viewBox="0 0 32 42"><path d="M16 41C16 41 2.5 25.5 2.5 15.5a13.5 13.5 0 0 1 27 0C29.5 25.5 16 41 16 41z" fill="${g.color}" stroke="#fff" stroke-width="2.5"/></svg><b>${orderIndex(t,p)}</b></div>`;
+    el.className='pin'+(p.id===selected?' sel':'')+(p.visited?' done':''); el.title=p.name+(p.visited?' (visited)':'');
+    el.innerHTML=`<div class="in"><svg viewBox="0 0 32 42"><path d="M16 41C16 41 2.5 25.5 2.5 15.5a13.5 13.5 0 0 1 27 0C29.5 25.5 16 41 16 41z" fill="${g.color}" stroke="#fff" stroke-width="2.5"/></svg>${p.visited?`<i>${ICON.check}</i>`:`<b>${orderIndex(t,p)}</b>`}</div>`;
     el.addEventListener('click',e=>{e.stopPropagation();openDetail(p.id)});
     markers.set(p.id,new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat([p.lon,p.lat]).addTo(map));
   }
@@ -746,11 +778,12 @@ const OV_BAD=/\b(map|plan|logo|drawing|painting|sketch|poster|lego|minifig|doll|
 let ovGate=Promise.resolve();
 const ovTurn=()=>{const t=ovGate.then(()=>new Promise(r=>setTimeout(r,900)));ovGate=t;return t};
 // Openverse search; a result must mention one of the place's names in its title or tags.
+// Without an API key Openverse allows at most 20 results per request; asking for more returns 401.
 async function openverseSearch(query,names,placeName){
   let j;
   for(let i=0;i<3;i++){
     await ovTurn();
-    let r;try{r=await fetch('https://api.openverse.org/v1/images/?'+new URLSearchParams({q:query,page_size:30,mature:'false'}))}catch(e){r={ok:false,status:429}}
+    let r;try{r=await fetch('https://api.openverse.org/v1/images/?'+new URLSearchParams({q:query,page_size:20,mature:'false'}))}catch(e){r={ok:false,status:429}}
     if(r.ok){j=await r.json();break}
     if(i===2||(r.status!==429&&r.status<500))throw new Error('openverse '+r.status);
     await new Promise(res=>setTimeout(res,4000*(i+1)));
@@ -856,11 +889,11 @@ function sortedTrips(){
   return [...S.trips].sort((a,b)=>rank(a)-rank(b)||(a.start||'9').localeCompare(b.start||'9'));
 }
 function tripCard(t){
-  const st=status(t),cv=coverOf(t);
+  const st=status(t),cv=coverOf(t),v=t.places.filter(p=>p.visited).length;
   return `<div class="tcard" data-open="${t.id}" role="button" tabindex="0">
     <div class="cv" style="${cv?`background-image:url('${esc(cv)}')`:''}"></div>
     <div class="meta"><b>${esc(t.name)}</b><span class="sub">${esc(fmtRange(t)||'No dates yet')}</span>
-      <span class="sub">${t.places.length} ${t.places.length===1?'place':'places'}${st?` · <span class="pill ${st.kind}">${st.label}</span>`:''}</span>
+      <span class="sub">${t.places.length} ${t.places.length===1?'place':'places'}${v?` · ${v} visited`:''}${st?` · <span class="pill ${st.kind}">${st.label}</span>`:''}</span>
       ${roleOf(t)!=='owner'?`<span class="sub"><span class="pill shared">Shared by ${esc((t.ownerName||t.ownerEmail||'someone').split(' ')[0])}</span></span>`:(S.members?.[t.id]?.length?`<span class="sub"><span class="pill shared">Shared with ${S.members[t.id].length}</span></span>`:'')}</div>
     <button class="more" data-edit="${t.id}" aria-label="Trip settings">${ICON.more}</button></div>`;
 }
@@ -872,12 +905,12 @@ function renderHub(){
   const heroT=act[0]||past[0];
   $('#greetSub').textContent=heroT?(status(heroT)?.kind==='now'?`You're on ${heroT.name} right now.`:'Here is what’s coming up.'):'Plan your first trip to get started.';
   if(heroT){
-    const st=status(heroT),cv=coverOf(heroT),n=nights(heroT);
+    const st=status(heroT),cv=coverOf(heroT),n=nights(heroT),v=heroT.places.filter(p=>p.visited).length;
     $('#heroSlot').innerHTML=`<button class="hero" data-open="${heroT.id}">
       ${cv?`<div class="cover" style="background-image:url('${esc(cv)}')"></div>`:`<svg class="grat" viewBox="0 0 100 100" fill="none" stroke="#8FC7E3" stroke-width="1.2"><circle cx="50" cy="50" r="44"/><ellipse cx="50" cy="50" rx="22" ry="44"/><path d="M6 50h88M11 30h78M11 70h78"/></svg>`}
       <div class="in">${st?`<span class="kicker">${st.label}</span>`:'<span class="kicker">Next up</span>'}
         <h2>${esc(heroT.name)}</h2><div class="sub">${esc(fmtRange(heroT)||'Add dates in trip settings')}</div>
-        <div class="stats"><span><b>${heroT.places.length}</b>places</span><span><b>${heroT.groups.length}</b>groups</span>${n?`<span><b>${n}</b>${n===1?'day':'days'}</span>`:''}</div>
+        <div class="stats"><span><b>${heroT.places.length}</b>places</span><span><b>${heroT.groups.length}</b>groups</span>${n?`<span><b>${n}</b>${n===1?'day':'days'}</span>`:''}${v?`<span><b>${v}</b>visited</span>`:''}</div>
       </div></button>`;
     heroT.places.slice(0,4).forEach(ensureInfo);
   } else $('#heroSlot').innerHTML=`<div class="empty-hub"><img src="logo.svg" alt=""><h2>${user?'Your atlas is empty':'No trips yet'}</h2><p>Plan a trip, add the places you want to see, and they will show up here and on the map.</p><button class="btn primary" data-new>Plan your first trip</button></div>`;
@@ -898,34 +931,41 @@ function openTrip(id){S.current=id;save();filter='all';closeDetail();setTab('map
 function renderTripUI(){
   const t=trip();
   if(!t){$('#tripName').textContent='No trip';$('#tripSub').textContent='';$('#chips').innerHTML='';renderMarkers();renderList();return}
+  const nv=t.places.filter(p=>p.visited).length;
   $('#tripName').textContent=t.name;
-  $('#tripSub').textContent=[fmtRange(t),`${t.places.length} ${t.places.length===1?'place':'places'}`].filter(Boolean).join(' · ');
-  if(filter!=='all'&&!t.groups.some(g=>g.id===filter)) filter='all';
-  $('#chips').innerHTML=`<button class="chip glass" data-g="all" aria-pressed="${filter==='all'}">All</button>`+t.groups.map(g=>`<button class="chip glass" data-g="${g.id}" aria-pressed="${filter===g.id}" style="--c:${g.color}"><i></i>${esc(g.name)}</button>`).join('');
+  $('#tripSub').textContent=[fmtRange(t),`${t.places.length} ${t.places.length===1?'place':'places'}`,nv?`${nv} visited`:''].filter(Boolean).join(' · ');
+  if(filter==='visited'?!nv:(filter!=='all'&&!t.groups.some(g=>g.id===filter))) filter='all';
+  $('#chips').innerHTML=`<button class="chip glass" data-g="all" aria-pressed="${filter==='all'}">All</button>`+t.groups.map(g=>`<button class="chip glass" data-g="${g.id}" aria-pressed="${filter===g.id}" style="--c:${g.color}"><i></i>${esc(g.name)}</button>`).join('')
+    +(nv?`<button class="chip glass" data-g="visited" aria-pressed="${filter==='visited'}">${ICON.check}Visited · ${nv}</button>`:'');
   renderMarkers(); renderList();
 }
 function renderList(onlyDist){
-  const t=trip(),ul=$('#list'),ps=visiblePlaces();
-  $('#sheetTitle').textContent=filter==='all'?'Places':(t?.groups.find(g=>g.id===filter)?.name||'Places');
-  $('#sheetCount').textContent=`${ps.length} ${ps.length===1?'place':'places'}${me?' · live distance':''}`;
+  const t=trip(),ul=$('#list'),ps=visiblePlaces(),vis=filter==='visited';
+  const done=t&&!vis?t.places.filter(p=>p.visited&&(filter==='all'||p.group===filter)).length:0;   // visited here, now listed under Visited
+  $('#sheetTitle').textContent=vis?'Already visited':filter==='all'?'Places':(t?.groups.find(g=>g.id===filter)?.name||'Places');
+  $('#sheetCount').textContent=`${ps.length} ${ps.length===1?'place':'places'}${done?` · ${done} visited`:''}${me?' · live distance':''}`;
   if(onlyDist){for(const p of ps){const el=ul.querySelector(`.item[data-id="${p.id}"] .d`);if(el)el.textContent=' · '+dist(p)}return}
   if(!t){ul.innerHTML='<li class="empty">Create a trip in the Trips tab.</li>';return}
-  if(!ps.length){ul.innerHTML='<li class="empty">No places yet. Tap + to search for one, or press and hold on the map.</li>';return}
-  let html='',last=null;
+  if(!ps.length){ul.innerHTML=done?'<li class="empty">You’ve visited every place here. Find them under Visited.</li>':'<li class="empty">No places yet. Tap + to search for one, or press and hold on the map.</li>';return}
+  let html='',last=null;const edit=canEdit(t);
   for(const p of ps){
     const g=groupOf(t,p);
-    if(filter==='all'&&g.id!==last){html+=`<li class="group-title">${esc(g.name)}</li>`;last=g.id}
+    if((filter==='all'||vis)&&g.id!==last){html+=`<li class="group-title">${esc(g.name)}</li>`;last=g.id}
     const img=photoOf(p);
     html+=`<li class="item" data-id="${p.id}" role="button" tabindex="0">
       <div class="thumb" style="--c:${g.color};${img?`background-image:url('${esc(img)}')`:''}">${img?'':esc(p.name.trim()[0]||'?')}<span class="n">${orderIndex(t,p)}</span></div>
-      <div class="meta"><b>${esc(p.name)}</b><span class="sub" style="--c:${g.color}"><i></i>${esc(g.name)}<span class="d">${me?' · '+dist(p):''}</span></span>${p.note?`<span class="note">${esc(p.note)}</span>`:''}</div></li>`;
+      <div class="meta"><b>${esc(p.name)}</b><span class="sub" style="--c:${g.color}"><i></i>${esc(g.name)}<span class="d">${me?' · '+dist(p):''}</span></span>${p.note?`<span class="note">${esc(p.note)}</span>`:''}</div>${edit?`<button class="tick${p.visited?' on':''}" data-visit="${p.id}" aria-label="${p.visited?'Mark as not visited':'Mark as visited'}"><span>${ICON.check}</span></button>`:''}</li>`;
   }
   ul.innerHTML=html; ps.forEach(ensureInfo);
 }
-$('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;filter=b.dataset.g;renderTripUI();fitAll()};
+$('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;filter=b.dataset.g;$('#list').scrollTop=0;renderTripUI();fitAll()};
 $('#sheetHead').onclick=()=>document.body.classList.toggle('sheet-open');
-$('#list').onclick=e=>{const li=e.target.closest('.item');if(li)openDetail(li.dataset.id)};
-$('#list').onkeydown=e=>{const li=e.target.closest('.item');if(li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDetail(li.dataset.id)}};
+$('#list').onclick=e=>{
+  const li=e.target.closest('.item'),tk=e.target.closest('[data-visit]');
+  if(tk){const p=trip()?.places.find(x=>x.id===tk.dataset.visit);if(!p||li?.classList.contains('leaving'))return;
+    tk.classList.toggle('on',!p.visited);li?.classList.add('leaving');setTimeout(()=>setVisited(p,!p.visited),230);return}
+  if(li)openDetail(li.dataset.id)};
+$('#list').onkeydown=e=>{if(e.target.closest('[data-visit]'))return;const li=e.target.closest('.item');if(li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDetail(li.dataset.id)}};
 $('#fitBtn').onclick=()=>fitAll();
 $('#locBtn').onclick=startLocate;
 $('#addBtn').onclick=()=>{if(!trip()){toast('Create a trip first.');setTab('trips');return}if(!canEdit(trip())){toast('You can view this trip but not edit it.');return}openPlaceForm(null)};
@@ -950,7 +990,8 @@ function renderDetail(p){
     <div class="hero-photo"><div class="strip" id="strip">${photos}</div>${phs.length?`<span class="zoom-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Tap to view</span>`:''}${phs.length>1?`<span class="count" id="phCount">1 / ${phs.length}</span>`:''}</div>
     <div class="d-body" style="--c:${g.color}">
       <h2>${esc(p.name)}</h2>
-      <div class="d-tags"><span class="tag" style="--c:${g.color}"><i></i>${esc(g.name)} · #${orderIndex(t,p)}</span>${me?`<span>${dist(p)} away</span>`:''}</div>
+      <div class="d-tags"><span class="tag" style="--c:${g.color}"><i></i>${esc(g.name)} · #${orderIndex(t,p)}</span>${!canEdit(t)&&p.visited?`<span class="tag done">${ICON.check}Visited</span>`:''}${me?`<span>${dist(p)} away</span>`:''}</div>
+      ${canEdit(t)?`<button class="btn visit${p.visited?' on':''}" id="dVisit">${ICON.check}${p.visited?`Visited${p.visitedAt?' · '+esc(fmtWhen(p.visitedAt)):''} <small>· Undo</small>`:'Mark as visited'}</button>`:''}
       ${p.note?`<div class="note-box">${esc(p.note)}</div>`:''}
       ${inf?.extract?`<div class="extract">${esc(inf.extract)} <a href="https://en.wikipedia.org/wiki/${encodeURIComponent(inf.title)}" target="_blank" rel="noopener">Wikipedia</a></div>`:''}
       <div class="actions">
@@ -962,6 +1003,7 @@ function renderDetail(p){
       <p class="credit">Photos by travellers on Flickr and Wikimedia Commons under open licences, found through Openverse and Wikipedia.</p>
     </div>`;
   $('#dEdit')&&($('#dEdit').onclick=()=>openPlaceForm(p));
+  $('#dVisit')&&($('#dVisit').onclick=()=>setVisited(p,!p.visited));
   const strip=$('#strip'),cnt=$('#phCount');
   if(strip&&cnt) strip.addEventListener('scroll',()=>{cnt.textContent=`${Math.round(strip.scrollLeft/strip.clientWidth)+1} / ${phs.length}`},{passive:true});
   strip?.querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>openViewer(phs,+b.dataset.ph,p));
@@ -1007,7 +1049,7 @@ function openPlaceForm(p,at){
   $('#pfTitle').textContent=p?'Edit place':'New place';
   $('#pfGroup').innerHTML=t.groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')||'<option value="">No group</option>';
   $('#pfName').value=p?.name||'';$('#pfNote').value=p?.note||'';$('#pfWiki').value=p?.wiki||'';
-  $('#pfGroup').value=p?.group||(filter!=='all'?filter:(t.groups[t.groups.length-1]?.id||''));
+  $('#pfGroup').value=p?.group||(filter!=='all'&&filter!=='visited'?filter:(t.groups[t.groups.length-1]?.id||''));
   $('#pfQ').value='';$('#pfResults').innerHTML='';
   picked=p?{lat:p.lat,lon:p.lon}:(at||null);showPicked();
   $('#pfDel').hidden=!p;$('#pfUp').hidden=!p;$('#pfDel').dataset.arm='';$('#pfDel').textContent='Delete';
