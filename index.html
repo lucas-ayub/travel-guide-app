@@ -47,10 +47,12 @@ svg{display:block}
 .maplibregl-ctrl-attrib{font-size:10px}
 .maplibregl-ctrl-bottom-right{bottom:calc(var(--tabh) + 92px)}
 body.sheet-open .maplibregl-ctrl-bottom-right{bottom:calc(var(--tabh) + 50vh)}
-.pin{cursor:pointer;width:32px;height:40px;display:grid;justify-items:center;filter:drop-shadow(0 3px 5px rgba(0,0,0,.35));transition:transform .15s}
-.pin span{width:30px;height:30px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:var(--c);border:2.5px solid #fff;display:grid;place-items:center}
-.pin b{transform:rotate(45deg);color:#fff;font:700 12.5px/1 var(--body)}
-.pin.sel{transform:scale(1.28);z-index:5}
+.pin{cursor:pointer;width:32px;height:42px}
+.pin .in{width:32px;height:42px;position:relative;transform-origin:50% 100%;transition:transform .18s ease;filter:drop-shadow(0 3px 4px rgba(0,0,0,.35))}
+.pin svg{position:absolute;inset:0;width:32px;height:42px}
+.pin b{position:absolute;left:0;right:0;top:8px;text-align:center;color:#fff;font:700 12.5px/1 var(--body);font-variant-numeric:tabular-nums}
+.pin.sel{z-index:5}
+.pin.sel .in{transform:scale(1.3)}
 .me{width:20px;height:20px;border-radius:50%;background:#2F7DE1;border:3px solid #fff;box-shadow:0 0 0 0 rgba(47,125,225,.5);animation:pulse 2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,125,225,.45)}70%{box-shadow:0 0 0 16px rgba(47,125,225,0)}100%{box-shadow:0 0 0 0 rgba(47,125,225,0)}}
 
@@ -189,7 +191,11 @@ body[data-tab="trips"] #view-trips,body[data-tab="account"] #view-account{displa
 .sync{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted)}
 .sync i{width:9px;height:9px;border-radius:50%;background:var(--muted)}
 .sync.ok i{background:var(--good)}.sync.err i{background:var(--accent)}.sync.busy i{background:#E5A11A}
-.err-msg{color:var(--accent);font-size:13.5px;margin:0}
+.card .err-msg,.err-msg{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:600;margin:0}
+.card .ok-msg{color:var(--good);background:color-mix(in srgb,var(--good) 12%,transparent);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:600;margin:0}
+.linkbtn{border:0;background:none;color:var(--accent);font-weight:700;padding:4px 0;align-self:center}
+.signed{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--good)}
+.signed svg{width:16px;height:16px}
 .steps{margin:0;padding-left:20px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
 .steps code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-size:13px}
 
@@ -357,7 +363,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=4"></script>
+<script src="config.js?v=5"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -431,7 +437,7 @@ function blankTrip(name,start,end){return{id:uid(),name,start:start||'',end:end|
 
 /* ================= State ================= */
 const CFG=window.ATLAS_CONFIG||{};
-const sb=(CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase)?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}}):null;
+const sb=(CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase)?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}}):null;
 let user=null;                 // {id,email,name}
 let S=null;                    // {trips,current,prefs}
 let tab='trips', filter='all', selected=null;
@@ -508,8 +514,8 @@ function renderMarkers(){
   for(const p of visiblePlaces()){
     const g=groupOf(t,p);
     const el=document.createElement('div');
-    el.className='pin'+(p.id===selected?' sel':''); el.style.setProperty('--c',g.color);
-    el.innerHTML=`<span><b>${orderIndex(t,p)}</b></span>`; el.title=p.name;
+    el.className='pin'+(p.id===selected?' sel':''); el.title=p.name;
+    el.innerHTML=`<div class="in"><svg viewBox="0 0 32 42"><path d="M16 41C16 41 2.5 25.5 2.5 15.5a13.5 13.5 0 0 1 27 0C29.5 25.5 16 41 16 41z" fill="${g.color}" stroke="#fff" stroke-width="2.5"/></svg><b>${orderIndex(t,p)}</b></div>`;
     el.addEventListener('click',e=>{e.stopPropagation();openDetail(p.id)});
     markers.set(p.id,new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat([p.lon,p.lat]).addTo(map));
   }
@@ -855,11 +861,14 @@ async function onSignedIn(sessionUser){
 function onSignedOut(){user=null;loadState();renderAll()}
 
 /* ================= Account tab ================= */
-let authMode='signup',authEmail='',authName='',authErr='',authBusy=false;
+let authMode='signup',authEmail='',authName='',authErr='',authOk='',authBusy=false,recovering=false;
 const syncLine=()=>{const m={off:['','Cloud sync is not set up'],idle:['','Not synced yet'],busy:['busy','Syncing…'],ok:['ok',`Synced ${sync.at?sync.at.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):''}`],err:['err','Sync failed: '+sync.msg]}[sync.state];return`<div class="sync ${m[0]}"><i></i>${esc(m[1])}</div>`};
 function renderAccount(){
   const w=$('#accountWrap');const initials=(user?.name||user?.email||'?').trim()[0]?.toUpperCase()||'?';
   let html=`<div class="brand"><img src="logo.svg" alt=""><b>Account</b></div>`;
+  if(sb&&user&&recovering) html+=`<div class="card"><h3>Choose a new password</h3><form id="newPassForm" class="stack">
+      <label class="f">New password<input type="password" id="aNewPass" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters"></label>
+      ${authErr?`<p class="err-msg" role="alert">${esc(authErr)}</p>`:''}<button class="btn primary">Save password</button></form></div>`;
   if(!sb){
     html+=`<div class="card"><h3>Accounts are almost ready</h3><p>To sign in and sync trips between devices, connect a free Supabase project:</p>
       <ol class="steps"><li>Create a project at supabase.com.</li><li>Run <code>setup.sql</code> in its SQL editor.</li><li>Put the project URL and anon key in <code>config.js</code>.</li></ol>
@@ -872,8 +881,10 @@ function renderAccount(){
         ${up?`<label class="f">Name<input type="text" id="aName" autocomplete="name" required value="${esc(authName)}" placeholder="Your name"></label>`:''}
         <label class="f">Email<input type="email" id="aEmail" autocomplete="email" required value="${esc(authEmail)}" placeholder="you@example.com"></label>
         <label class="f">Password<input type="password" id="aPass" autocomplete="${up?'new-password':'current-password'}" required minlength="6" placeholder="${up?'At least 6 characters':'Your password'}"></label>
-        ${authErr?`<p class="err-msg">${esc(authErr)}</p>`:''}
+        ${authErr?`<p class="err-msg" role="alert">${esc(authErr)}</p>`:''}
+        ${authOk?`<p class="ok-msg" role="status">${esc(authOk)}</p>`:''}
         <button class="btn primary" ${authBusy?'disabled':''}>${authBusy?'One moment…':(up?'Create account':'Sign in')}</button>
+        ${up?'':'<button type="button" class="linkbtn" id="aForgot">Forgot password?</button>'}
         <button type="button" class="btn" id="aSwitch">${up?'I already have an account':'Create a new account'}</button>
       </form></div>
       <div class="card"><p>Without an account, your trips stay on this device. When you sign in, they move into your account and sync everywhere.</p></div>`;
@@ -889,6 +900,7 @@ function renderAccount(){
         <div><b>${esc(user.name||'Traveller')}</b><span>${esc(user.email)}</span>${since?`<span style="display:block">Member since ${esc(since)}</span>`:''}</div></div>
       <div class="stats3"><div><b>${S.trips.length}</b><span>${S.trips.length===1?'trip':'trips'}</span></div><div><b>${places}</b><span>places</span></div><div><b>${upcoming.length}</b><span>upcoming</span></div></div>
       ${next?`<button class="next" data-next="${next.id}"><div class="cv" style="${coverOf(next)?`background-image:url('${esc(coverOf(next))}')`:''}"></div><div class="meta"><b>${esc(next.name)}</b><span class="sub">${esc(fmtRange(next))} · ${status(next).label}</span></div></button>`:''}
+      <div class="signed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Signed in on this device</div>
       ${syncLine()}
       <div class="grid-btns"><button class="btn" id="aSync">Sync now</button><button class="btn danger" id="aOut">Sign out</button></div></div>
     ${fromDevice.length?`<div class="card"><h3>Trips on this device</h3><p>${fromDevice.length} ${fromDevice.length===1?'trip was':'trips were'} saved on this phone before you signed in: ${esc(fromDevice.map(t=>t.name).join(', '))}. They stay separate unless you add them.</p><button class="btn primary" id="aAdopt">Add to my account</button></div>`:''}
@@ -900,7 +912,16 @@ function renderAccount(){
       <div class="grid-btns"><button class="btn" id="aExport">Export all</button><button class="btn" id="aImport">Import</button></div></div>`;
   w.innerHTML=html;
   $('#authForm')?.addEventListener('submit',submitAuth);
-  $('#aSwitch')&&($('#aSwitch').onclick=()=>{authMode=authMode==='signup'?'signin':'signup';authErr='';renderAccount()});
+  $('#aSwitch')&&($('#aSwitch').onclick=()=>{authMode=authMode==='signup'?'signin':'signup';authErr='';authOk='';renderAccount()});
+  $('#aForgot')&&($('#aForgot').onclick=async()=>{
+    const email=$('#aEmail').value.trim();if(!email){authErr='Type your email above first.';authOk='';renderAccount();return}
+    authEmail=email;authBusy=true;renderAccount();
+    const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+    authBusy=false;authErr=error?error.message:'';authOk=error?'':`We sent a reset link to ${email}. Open it in Safari on this phone to choose a new password.`;renderAccount()});
+  $('#newPassForm')?.addEventListener('submit',async e=>{e.preventDefault();const pw=$('#aNewPass').value;
+    if(pw.length<6){authErr='Use at least 6 characters.';renderAccount();return}
+    const{error}=await sb.auth.updateUser({password:pw});if(error){authErr=error.message;renderAccount();return}
+    recovering=false;authErr='';toast('Password updated');renderAccount()});
   $('#aOut')&&($('#aOut').onclick=async()=>{await sb.auth.signOut();toast('Signed out')});
   $('#aSync')&&($('#aSync').onclick=pull);
   document.querySelector('[data-next]')?.addEventListener('click',e=>openTrip(e.currentTarget.dataset.next));
@@ -918,13 +939,14 @@ async function submitAuth(e){
   if(authMode==='signup') res=await sb.auth.signUp({email:authEmail,password,options:{data:{name:authName}}});
   else res=await sb.auth.signInWithPassword({email:authEmail,password});
   authBusy=false;
+  authOk='';
   if(res.error){
     const m=res.error.message||'';
-    authErr=/invalid login/i.test(m)?'Email or password is wrong.':/already registered/i.test(m)?'This email already has an account. Sign in instead.':m;
+    authErr=/invalid login/i.test(m)?'That email and password don’t match. Check the password, or tap “Forgot password?”.':/already registered/i.test(m)?'This email already has an account. Sign in instead.':/not confirmed/i.test(m)?'This email is not confirmed yet. Turn off “Confirm email” in Supabase or open the confirmation email.':m;
     renderAccount();return;
   }
   if(authMode==='signup'&&!res.data.session){authMode='signin';authErr='Account created. Confirm the email we sent, then sign in.';renderAccount();return}
-  toast(authMode==='signup'?'Account created':'Signed in');
+  toast(`Signed in as ${authEmail}`);
 }
 
 /* ================= Tabs & boot ================= */
@@ -945,6 +967,7 @@ loadState();initMap();renderAll();
 map.once('load',()=>fitAll(false));
 if(sb){
   sb.auth.onAuthStateChange((ev,session)=>{
+    if(ev==='PASSWORD_RECOVERY'){recovering=true;setTimeout(()=>setTab('account'),0)}
     if(session?.user&&(!user||user.id!==session.user.id)) setTimeout(()=>onSignedIn(session.user),0);
     else if(!session&&user) setTimeout(onSignedOut,0);
     else if(session?.user&&user){user.name=session.user.user_metadata?.name||user.name;paintAvatars()}
