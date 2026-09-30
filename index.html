@@ -405,7 +405,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=9"></script>
+<script src="config.js?v=10"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -596,9 +596,9 @@ function dist(p){
 const WP='https://en.wikipedia.org/w/api.php',CM='https://commons.wikimedia.org/w/api.php';
 async function q(base,params,tries=3){
   for(let i=0;;i++){
-    try{const r=await fetch(base+'?'+new URLSearchParams({format:'json',origin:'*',maxlag:5,...params}));
+    try{const r=await fetch(base+'?'+new URLSearchParams({format:'json',origin:'*',...params}));
       if(r.status===429||r.status>=500)throw new Error('busy '+r.status);
-      const j=await r.json();if(j?.error?.code==='maxlag')throw new Error('maxlag');return j}
+      return await r.json()}
     catch(e){if(i>=tries-1)throw e;await new Promise(res=>setTimeout(res,600*(i+1)+Math.random()*400))}
   }
 }
@@ -661,7 +661,8 @@ async function wikimediaPhotos(p,art){
   }
   const [cons,wd]=await Promise.all([consensusFiles(art.title),art.qid?wikidata(art.qid).catch(()=>null):null]);
   const lead=(wd?.images||[]).map(f=>f.replace(/_/g,' '));
-  const ranked=[...lead,...cons.filter(x=>x.c>=2||cons.length<6).map(x=>x.f)].filter((f,i,a)=>a.indexOf(f)===i).slice(0,18);
+  const score=x=>x.c+(similar(p.name,x.f)||similar(art.title,x.f)?1.5:0);
+  const ranked=[...lead,...cons.filter(x=>x.c>=2||cons.length<6).sort((a,b)=>score(b)-score(a)).map(x=>x.f)].filter((f,i,a)=>a.indexOf(f)===i).slice(0,18);
   if(!ranked.length)return [];
   const info=await commonsFiles({titles:ranked.map(f=>'File:'+f).join('|')});
   const byName=new Map(info.map(f=>[f.title,f]));
