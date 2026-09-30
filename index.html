@@ -195,7 +195,7 @@ dialog::backdrop{background:var(--scrim)}
 .x{border:0;background:var(--surface-2);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none}
 .x svg{width:16px;height:16px}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
-input[type=text],input[type=search],input[type=email],input[type=date],select,textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:12px 13px;font-size:16px;text-transform:none;letter-spacing:0;font-weight:400;min-height:48px}
+input[type=text],input[type=search],input[type=email],input[type=password],input[type=date],select,textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:12px 13px;font-size:16px;text-transform:none;letter-spacing:0;font-weight:400;min-height:48px}
 input.code{font:700 26px/1 var(--display);letter-spacing:.35em;text-align:center}
 textarea{min-height:84px;resize:vertical}
 .row2{display:flex;gap:8px}
@@ -833,7 +833,7 @@ async function onSignedIn(sessionUser){
 function onSignedOut(){user=null;loadState();renderAll()}
 
 /* ================= Account tab ================= */
-let authStep='email',authEmail='',authName='',authErr='',authBusy=false;
+let authMode='signup',authEmail='',authName='',authErr='',authBusy=false;
 const syncLine=()=>{const m={off:['','Cloud sync is not set up'],idle:['','Not synced yet'],busy:['busy','Syncing…'],ok:['ok',`Synced ${sync.at?sync.at.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):''}`],err:['err','Sync failed: '+sync.msg]}[sync.state];return`<div class="sync ${m[0]}"><i></i>${esc(m[1])}</div>`};
 function renderAccount(){
   const w=$('#accountWrap');const initials=(user?.name||user?.email||'?').trim()[0]?.toUpperCase()||'?';
@@ -843,20 +843,17 @@ function renderAccount(){
       <ol class="steps"><li>Create a project at supabase.com.</li><li>Run <code>setup.sql</code> in its SQL editor.</li><li>Put the project URL and anon key in <code>config.js</code>.</li></ol>
       <p>Until then, trips are saved on this device.</p></div>`;
   } else if(!user){
-    html+=`<div class="card"><h3>${authStep==='email'?'Sign in or create an account':'Check your email'}</h3>
-      ${authStep==='email'?`<p>We'll email you a 6-digit code. No password needed.</p>
-        <form id="authForm" class="stack">
-          <label class="f">Name<input type="text" id="aName" autocomplete="name" value="${esc(authName)}" placeholder="Your name"></label>
-          <label class="f">Email<input type="email" id="aEmail" autocomplete="email" required value="${esc(authEmail)}" placeholder="you@example.com"></label>
-          ${authErr?`<p class="err-msg">${esc(authErr)}</p>`:''}
-          <button class="btn primary" ${authBusy?'disabled':''}>${authBusy?'Sending…':'Send code'}</button></form>`
-      :`<p>We sent a 6-digit code to <b>${esc(authEmail)}</b>. Type it below.</p>
-        <form id="codeForm" class="stack">
-          <input class="code" type="text" id="aCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
-          ${authErr?`<p class="err-msg">${esc(authErr)}</p>`:''}
-          <button class="btn primary" ${authBusy?'disabled':''}>${authBusy?'Checking…':'Sign in'}</button>
-          <button type="button" class="btn" id="aBack">Use a different email</button></form>`}
-      </div>
+    const up=authMode==='signup';
+    html+=`<div class="card"><h3>${up?'Create your account':'Sign in'}</h3>
+      <p>${up?'Your trips will sync between your phone and computer.':'Welcome back. Your trips will sync to this device.'}</p>
+      <form id="authForm" class="stack">
+        ${up?`<label class="f">Name<input type="text" id="aName" autocomplete="name" required value="${esc(authName)}" placeholder="Your name"></label>`:''}
+        <label class="f">Email<input type="email" id="aEmail" autocomplete="email" required value="${esc(authEmail)}" placeholder="you@example.com"></label>
+        <label class="f">Password<input type="password" id="aPass" autocomplete="${up?'new-password':'current-password'}" required minlength="6" placeholder="${up?'At least 6 characters':'Your password'}"></label>
+        ${authErr?`<p class="err-msg">${esc(authErr)}</p>`:''}
+        <button class="btn primary" ${authBusy?'disabled':''}>${authBusy?'One moment…':(up?'Create account':'Sign in')}</button>
+        <button type="button" class="btn" id="aSwitch">${up?'I already have an account':'Create a new account'}</button>
+      </form></div>
       <div class="card"><p>Without an account, your trips stay on this device. When you sign in, they move into your account and sync everywhere.</p></div>`;
   } else {
     html+=`<div class="card"><div class="profile"><span class="avatar">${esc(initials)}</span><div style="min-width:0"><b>${esc(user.name||'Traveller')}</b><span>${esc(user.email)}</span></div></div>
@@ -869,9 +866,8 @@ function renderAccount(){
     <div class="card"><h3>Backup</h3><p>Export all trips as a file, or import a backup or a Google My Maps .kml.</p>
       <div class="grid-btns"><button class="btn" id="aExport">Export all</button><button class="btn" id="aImport">Import</button></div></div>`;
   w.innerHTML=html;
-  $('#authForm')?.addEventListener('submit',sendCode);
-  $('#codeForm')?.addEventListener('submit',verifyCode);
-  $('#aBack')&&($('#aBack').onclick=()=>{authStep='email';authErr='';renderAccount()});
+  $('#authForm')?.addEventListener('submit',submitAuth);
+  $('#aSwitch')&&($('#aSwitch').onclick=()=>{authMode=authMode==='signup'?'signin':'signup';authErr='';renderAccount()});
   $('#aOut')&&($('#aOut').onclick=async()=>{await sb.auth.signOut();toast('Signed out')});
   $('#aSync')&&($('#aSync').onclick=pull);
   $('#aRename')&&($('#aRename').onchange=async e=>{const n=e.target.value.trim();const{error}=await sb.auth.updateUser({data:{name:n}});if(!error){user.name=n;toast('Name saved');renderHub()}});
@@ -879,19 +875,21 @@ function renderAccount(){
   $('#aExport').onclick=()=>exportFile(null,'trip-atlas-backup');
   $('#aImport').onclick=()=>$('#fileIn').click();
 }
-async function sendCode(e){
-  e.preventDefault();authName=$('#aName').value.trim();authEmail=$('#aEmail').value.trim();authErr='';authBusy=true;renderAccount();
-  const{error}=await sb.auth.signInWithOtp({email:authEmail,options:{shouldCreateUser:true,data:{name:authName}}});
-  authBusy=false;if(error){authErr=error.message;renderAccount();return}
-  authStep='code';renderAccount();setTimeout(()=>$('#aCode')?.focus(),60);
-}
-async function verifyCode(e){
-  e.preventDefault();const token=$('#aCode').value.replace(/\D/g,'');if(token.length<6){authErr='Enter the 6-digit code.';renderAccount();return}
-  authBusy=true;authErr='';renderAccount();
-  const{data,error}=await sb.auth.verifyOtp({email:authEmail,token,type:'email'});
-  authBusy=false;if(error){authErr='That code did not work. Check it or send a new one.';renderAccount();return}
-  if(authName&&data?.user&&!data.user.user_metadata?.name) await sb.auth.updateUser({data:{name:authName}});
-  authStep='email';toast('Signed in');
+async function submitAuth(e){
+  e.preventDefault();
+  authName=$('#aName')?.value.trim()||authName;authEmail=$('#aEmail').value.trim();const password=$('#aPass').value;
+  authErr='';authBusy=true;renderAccount();
+  let res;
+  if(authMode==='signup') res=await sb.auth.signUp({email:authEmail,password,options:{data:{name:authName}}});
+  else res=await sb.auth.signInWithPassword({email:authEmail,password});
+  authBusy=false;
+  if(res.error){
+    const m=res.error.message||'';
+    authErr=/invalid login/i.test(m)?'Email or password is wrong.':/already registered/i.test(m)?'This email already has an account. Sign in instead.':m;
+    renderAccount();return;
+  }
+  if(authMode==='signup'&&!res.data.session){authMode='signin';authErr='Account created. Confirm the email we sent, then sign in.';renderAccount();return}
+  toast(authMode==='signup'?'Account created':'Signed in');
 }
 
 /* ================= Tabs & boot ================= */
