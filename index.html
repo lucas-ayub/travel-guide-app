@@ -145,6 +145,7 @@ textarea{min-height:80px;resize:vertical}
 .pin span{display:grid;place-items:center;width:28px;height:28px;border-radius:50% 50% 50% 6px;transform:rotate(-45deg);background:var(--c);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
 .pin b{transform:rotate(45deg);color:#fff;font:700 12px/1 var(--body)}
 .pin.sel span{width:36px;height:36px;margin:-4px 0 0 -4px}
+.tiles-dark{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6)}
 .leaflet-control-attribution{font-size:9px;background:rgba(255,255,255,.7)!important;margin-bottom:calc(var(--sb) + 88px)!important}
 @media (prefers-color-scheme: dark){.leaflet-control-attribution{background:rgba(0,0,0,.5)!important;color:#aaa}.leaflet-control-attribution a{color:#ccc}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
@@ -329,10 +330,9 @@ const map = L.map('map',{zoomControl:false, tapHold:true}).setView([55.68,12.57]
 let tiles;
 function setTiles(){
   if(tiles) map.removeLayer(tiles);
-  const style = dark.matches ? 'dark_all' : 'rastertiles/voyager';
-  tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`,{
-    maxZoom:20, subdomains:'abcd',
-    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>'
+  tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19, className: dark.matches ? 'tiles-dark' : '',
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
 }
 setTiles(); dark.addEventListener?.('change', setTiles);
