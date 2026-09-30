@@ -178,6 +178,12 @@ body[data-tab="trips"] #view-trips,body[data-tab="account"] #view-account{displa
 .profile .avatar{width:88px;height:88px;font-size:40px}
 .profile b{font:800 24px/1.1 var(--display);letter-spacing:-.01em;display:block}
 .profile div span{color:var(--muted);font-size:14px;word-break:break-all}
+.share-row{display:flex;gap:8px;align-items:center;background:var(--surface-2);border-radius:14px;padding:6px 6px 6px 12px}
+.share-row .who{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.share-row select{width:auto;min-height:38px;padding:6px 8px;font-size:14px;background:var(--surface)}
+.share-row .avatar{width:28px;height:28px;font-size:13px}
+.pill.shared{background:color-mix(in srgb,var(--navy) 16%,transparent);color:var(--navy)}
+.viewonly{display:flex;gap:8px;align-items:center;font-size:13.5px;color:var(--muted);background:var(--surface-2);border-radius:12px;padding:10px 12px}
 .stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stats3 div{background:var(--surface-2);border-radius:16px;padding:12px 8px;text-align:center}
 .stats3 b{display:block;font:800 24px/1.1 var(--display);font-variant-numeric:tabular-nums}
@@ -324,6 +330,14 @@ textarea{min-height:84px;resize:vertical}
         <button type="button" class="btn" id="addGroup" style="margin-top:8px;width:100%">Add group</button>
       </div>
       <button type="submit" class="btn primary" id="tfSave">Save</button>
+      <div id="shareSec" class="stack" hidden>
+        <p class="section-t">Share this trip</p>
+        <div class="stack" id="shareList" style="gap:6px"></div>
+        <div class="row2"><input type="email" id="shEmail" placeholder="friend@email.com" autocomplete="off">
+          <select id="shRole" style="flex:none;width:auto"><option value="editor">Can edit</option><option value="viewer">Can view</option></select></div>
+        <button type="button" class="btn" id="shAdd">Invite</button>
+        <p class="hint" id="shHint">They sign in to Trip Atlas with this email and the trip appears in their Trips tab.</p>
+      </div>
       <div class="grid-btns" id="tfMore">
         <button type="button" class="btn" id="exportTrip">Export backup</button>
         <button type="button" class="btn danger" id="delTrip">Delete trip</button>
@@ -363,7 +377,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=5"></script>
+<script src="config.js?v=6"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -444,6 +458,9 @@ let tab='trips', filter='all', selected=null;
 const keyFor=u=>'atlas.v2.'+(u?u.id:'guest');
 let INFO=load('atlas.info.v1')||load('roteiros.info.v1')||{};
 
+const roleOf=t=>(!user||!t)?'owner':(S.roles?.[t.id]||'owner');
+const canEdit=t=>roleOf(t)!=='viewer';
+const cleanTrip=t=>{const{_x,...r}=t;return r};
 function normTrip(t){t.id=t.id||uid();t.groups=t.groups||[];t.places=t.places||[];t.updated=t.updated||Date.now();t.start=t.start||'';t.end=t.end||'';return t}
 function loadGuest(){
   let s=load(keyFor(null));
@@ -456,7 +473,7 @@ function loadGuest(){
 }
 function loadState(){
   S=user?(load(keyFor(user))||{trips:[],current:null,prefs:{}}):loadGuest();
-  S.trips=(S.trips||[]).map(normTrip); S.prefs=S.prefs||{}; S.deleted=S.deleted||[];
+  S.trips=(S.trips||[]).map(normTrip); S.prefs=S.prefs||{}; S.deleted=S.deleted||[]; S.roles=S.roles||{}; S.members=S.members||{};
   if(!S.trips.find(t=>t.id===S.current)) S.current=S.trips[0]?.id||null;
   save();
 }
@@ -497,10 +514,10 @@ function initMap(){
   map.on('error',e=>{ if(String(e?.error?.message||'').includes('Failed to fetch')) toast('Map tiles need a connection.'); });
   // long press / right click to add a place
   let lp=null,lpt=null;const clear=()=>{clearTimeout(lpt);lp=null};
-  map.on('touchstart',e=>{ if(e.originalEvent.touches.length!==1){clear();return} lp=e.point; lpt=setTimeout(()=>{const ll=map.unproject(lp);clear();navigator.vibrate?.(10);openPlaceForm(null,{lat:ll.lat,lon:ll.lng})},600) });
+  map.on('touchstart',e=>{ if(e.originalEvent.touches.length!==1||!canEdit(trip())){clear();return} lp=e.point; lpt=setTimeout(()=>{const ll=map.unproject(lp);clear();navigator.vibrate?.(10);openPlaceForm(null,{lat:ll.lat,lon:ll.lng})},600) });
   map.on('touchmove',e=>{ if(lp&&(Math.abs(e.point.x-lp.x)>8||Math.abs(e.point.y-lp.y)>8)) clear() });
   map.on('touchend',clear); map.on('touchcancel',clear); map.on('dragstart',clear); map.on('zoomstart',clear);
-  map.on('contextmenu',e=>openPlaceForm(null,{lat:e.lngLat.lat,lon:e.lngLat.lng}));
+  map.on('contextmenu',e=>{if(canEdit(trip()))openPlaceForm(null,{lat:e.lngLat.lat,lon:e.lngLat.lng})});
 }
 function applyStyle(){const n=styleName();if(map&&n!==currentStyle){currentStyle=n;map.setStyle(STYLES[n])}}
 darkMq.addEventListener?.('change',applyStyle);
@@ -610,7 +627,8 @@ function tripCard(t){
   return `<div class="tcard" data-open="${t.id}" role="button" tabindex="0">
     <div class="cv" style="${cv?`background-image:url('${esc(cv)}')`:''}"></div>
     <div class="meta"><b>${esc(t.name)}</b><span class="sub">${esc(fmtRange(t)||'No dates yet')}</span>
-      <span class="sub">${t.places.length} ${t.places.length===1?'place':'places'}${st?` · <span class="pill ${st.kind}">${st.label}</span>`:''}</span></div>
+      <span class="sub">${t.places.length} ${t.places.length===1?'place':'places'}${st?` · <span class="pill ${st.kind}">${st.label}</span>`:''}</span>
+      ${roleOf(t)!=='owner'?`<span class="sub"><span class="pill shared">Shared by ${esc((t.ownerName||t.ownerEmail||'someone').split(' ')[0])}</span></span>`:(S.members?.[t.id]?.length?`<span class="sub"><span class="pill shared">Shared with ${S.members[t.id].length}</span></span>`:'')}</div>
     <button class="more" data-edit="${t.id}" aria-label="Trip settings">${ICON.more}</button></div>`;
 }
 function renderHub(){
@@ -677,7 +695,7 @@ $('#list').onclick=e=>{const li=e.target.closest('.item');if(li)openDetail(li.da
 $('#list').onkeydown=e=>{const li=e.target.closest('.item');if(li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDetail(li.dataset.id)}};
 $('#fitBtn').onclick=()=>fitAll();
 $('#locBtn').onclick=startLocate;
-$('#addBtn').onclick=()=>{if(!trip()){toast('Create a trip first.');setTab('trips');return}openPlaceForm(null)};
+$('#addBtn').onclick=()=>{if(!trip()){toast('Create a trip first.');setTab('trips');return}if(!canEdit(trip())){toast('You can view this trip but not edit it.');return}openPlaceForm(null)};
 $('#tripHead').onclick=()=>{const t=trip();if(t)openTripForm(t);else openTripForm(null)};
 
 /* ================= Place card ================= */
@@ -703,11 +721,11 @@ function renderDetail(p){
         <a class="btn primary wide" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}&travelmode=transit" target="_blank" rel="noopener">${ICON.nav}Directions in Google Maps</a>
         <a class="btn" href="https://maps.apple.com/?daddr=${p.lat},${p.lon}&q=${name}" target="_blank" rel="noopener">${ICON.apple}Apple Maps</a>
         <a class="btn" href="https://www.google.com/maps/search/?api=1&query=${name}%20${p.lat},${p.lon}" target="_blank" rel="noopener">${ICON.clock}Hours</a>
-        <button class="btn wide" id="dEdit">${ICON.edit}Edit place</button>
+        ${canEdit(t)?`<button class="btn wide" id="dEdit">${ICON.edit}Edit place</button>`:`<div class="viewonly wide" style="grid-column:1/-1">View only · shared by ${esc(t.ownerName||t.ownerEmail||'the owner')}</div>`}
       </div>
       <p class="credit">Photos from Wikipedia and Wikimedia Commons, taken near this spot. Tap a photo for its source.</p>
     </div>`;
-  $('#dEdit').onclick=()=>openPlaceForm(p);
+  $('#dEdit')&&($('#dEdit').onclick=()=>openPlaceForm(p));
   const strip=$('#strip'),cnt=$('#phCount');
   if(strip&&cnt) strip.addEventListener('scroll',()=>{cnt.textContent=`${Math.round(strip.scrollLeft/strip.clientWidth)+1} / ${inf.photos.length}`},{passive:true});
 }
@@ -766,11 +784,41 @@ function openTripForm(t){
   $('#tfTitle').textContent=t?'Trip settings':'Plan a new trip';
   $('#tfName').value=t?.name||'';$('#tfStart').value=t?.start||'';$('#tfEnd').value=t?.end||'';
   $('#tfExisting').hidden=!t;$('#tfMore').hidden=!t;$('#tfSave').textContent=t?'Save':'Create trip';
-  $('#delTrip').dataset.arm='';$('#delTrip').textContent='Delete trip';
-  renderGroupEd();$('#tripDlg').showModal();if(!t)setTimeout(()=>$('#tfName').focus(),60);
+  const role=t?roleOf(t):'owner',ro=role==='viewer';
+  ['tfName','tfStart','tfEnd'].forEach(id=>$('#'+id).disabled=ro);$('#tfSave').hidden=ro;$('#addGroup').hidden=ro;
+  $('#delTrip').dataset.arm='';$('#delTrip').textContent=role==='owner'?'Delete trip':'Leave trip';
+  $('#tfTitle').textContent=!t?'Plan a new trip':role==='owner'?'Trip settings':`Shared by ${t.ownerName||t.ownerEmail||'another traveller'}`;
+  $('#shareSec').hidden=!t||role!=='owner';
+  renderShare();renderGroupEd();$('#tripDlg').showModal();if(!t)setTimeout(()=>$('#tfName').focus(),60);
+  if(t&&role==='owner'&&sb&&user) loadMembers(t.id);
 }
+async function loadMembers(id){const{data}=await sb.from('trip_shares').select('email,role').eq('trip_id',id);if(data){S.members[id]=data;save();if(tEditing?.id===id)renderShare()}}
+function renderShare(){
+  const t=tEditing;if(!t||$('#shareSec').hidden)return;
+  if(!sb||!user){$('#shareList').innerHTML='';$('#shEmail').disabled=$('#shAdd').disabled=true;$('#shHint').textContent=sb?'Sign in (Account tab) to share this trip.':'Sharing needs accounts to be set up.';return}
+  $('#shEmail').disabled=$('#shAdd').disabled=false;$('#shHint').textContent='They sign in to Trip Atlas with this email and the trip appears in their Trips tab.';
+  const list=S.members[t.id]||[];
+  $('#shareList').innerHTML=list.map(m=>`<div class="share-row"><span class="avatar" style="--av:${avColor(m.email)}">${esc(m.email[0].toUpperCase())}</span><span class="who">${esc(m.email)}</span>
+    <select data-role="${esc(m.email)}" aria-label="Access for ${esc(m.email)}"><option value="editor" ${m.role==='editor'?'selected':''}>Can edit</option><option value="viewer" ${m.role==='viewer'?'selected':''}>Can view</option></select>
+    <button type="button" class="x" data-unshare="${esc(m.email)}" aria-label="Remove ${esc(m.email)}">${ICON.x}</button></div>`).join('')||'<p class="hint">Only you have access right now.</p>';
+  $('#shareList').querySelectorAll('[data-role]').forEach(s=>s.onchange=async()=>{const{error}=await sb.from('trip_shares').update({role:s.value}).eq('trip_id',t.id).eq('email',s.dataset.role);if(error){toast('Could not change access: '+error.message);return}const m=list.find(x=>x.email===s.dataset.role);if(m)m.role=s.value;save();toast('Access updated')});
+  $('#shareList').querySelectorAll('[data-unshare]').forEach(b=>b.onclick=async()=>{const{error}=await sb.from('trip_shares').delete().eq('trip_id',t.id).eq('email',b.dataset.unshare);if(error){toast('Could not remove: '+error.message);return}S.members[t.id]=list.filter(x=>x.email!==b.dataset.unshare);save();renderShare();renderHub();toast('Removed')});
+}
+$('#shAdd').onclick=async()=>{
+  const t=tEditing,email=$('#shEmail').value.trim().toLowerCase(),role=$('#shRole').value;
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast('Type a valid email.');return}
+  if(email===user.email.toLowerCase()){toast('That is your own email.');return}
+  $('#shAdd').disabled=true;$('#shAdd').textContent='Inviting…';
+  await pushTrip(t,true);
+  const{error}=await sb.from('trip_shares').upsert({trip_id:t.id,email,role});
+  $('#shAdd').disabled=false;$('#shAdd').textContent='Invite';
+  if(error){toast(/relation|does not exist/i.test(error.message)?'Run sharing.sql in Supabase first.':'Could not share: '+error.message);return}
+  S.members[t.id]=[...(S.members[t.id]||[]).filter(m=>m.email!==email),{email,role}];save();$('#shEmail').value='';renderShare();renderHub();
+  toast(`Shared with ${email}`);
+};
 function renderGroupEd(){
   const t=tEditing;if(!t){$('#groupEd').innerHTML='';return}
+  if(!canEdit(t)){$('#groupEd').innerHTML=t.groups.map(g=>`<div class="share-row"><span class="swatch" style="--c:${g.color};width:14px;height:14px;border-radius:50%"></span><span class="who">${esc(g.name)}</span></div>`).join('');return}
   $('#groupEd').innerHTML=t.groups.map((g,i)=>`<div class="g-row"><button type="button" class="swatch" data-i="${i}" style="--c:${g.color}" aria-label="Change color"></button><input type="text" id="g-${g.id}" data-i="${i}" value="${esc(g.name)}"><button type="button" class="x" data-del="${i}" aria-label="Remove group">${ICON.x}</button></div>`).join('');
   $('#groupEd').querySelectorAll('.swatch').forEach(b=>b.onclick=()=>{const g=t.groups[+b.dataset.i];g.color=PAL[(PAL.indexOf(g.color)+1)%PAL.length];touch(t);renderGroupEd();renderTripUI()});
   $('#groupEd').querySelectorAll('input').forEach(inp=>inp.onchange=()=>{t.groups[+inp.dataset.i].name=inp.value.trim()||'Group';touch(t);renderTripUI()});
@@ -780,12 +828,16 @@ $('#addGroup').onclick=()=>{const t=tEditing;t.groups.push({id:uid(),name:`Day $
 $('#tripForm').addEventListener('submit',e=>{
   e.preventDefault();const name=$('#tfName').value.trim();if(!name){toast('Give the trip a name.');return}
   let s=$('#tfStart').value,en=$('#tfEnd').value;if(s&&en&&en<s)[s,en]=[en,s];if(s&&!en)en=s;
+  if(tEditing&&!canEdit(tEditing)){$('#tripDlg').close();return}
   if(tEditing){Object.assign(tEditing,{name,start:s,end:en});touch(tEditing);$('#tripDlg').close();renderAll();toast('Trip saved')}
   else{const t=blankTrip(name,s,en);S.trips.push(t);S.current=t.id;touch(t);$('#tripDlg').close();renderAll();openTrip(t.id);document.body.classList.add('sheet-open');toast('Trip created. Tap + to add places.')}
 });
-$('#delTrip').onclick=()=>{const b=$('#delTrip');if(!b.dataset.arm){b.dataset.arm='1';b.textContent='Tap again to delete';return}
-  const id=tEditing.id;S.trips=S.trips.filter(x=>x.id!==id);S.deleted.push(id);if(S.current===id)S.current=S.trips[0]?.id||null;save();pushDelete(id);
-  $('#tripDlg').close();closeDetail();setTab('trips');renderAll();toast('Trip deleted')};
+$('#delTrip').onclick=async()=>{const b=$('#delTrip'),owner=roleOf(tEditing)==='owner';if(!b.dataset.arm){b.dataset.arm='1';b.textContent=owner?'Tap again to delete':'Tap again to leave';return}
+  const id=tEditing.id;
+  if(!owner){const{error}=await sb.from('trip_shares').delete().eq('trip_id',id).eq('email',user.email.toLowerCase());if(error){toast('Could not leave: '+error.message);return}delete S.roles[id]}
+  else{S.deleted.push(id);pushDelete(id)}
+  S.trips=S.trips.filter(x=>x.id!==id);if(S.current===id)S.current=S.trips[0]?.id||null;save();
+  $('#tripDlg').close();closeDetail();setTab('trips');renderAll();toast(owner?'Trip deleted':'You left the trip')};
 $('#exportTrip').onclick=()=>exportFile(tEditing?{app:'trip-atlas',version:2,trip:tEditing}:null,tEditing?.name);
 $('#newTripBtn').onclick=()=>openTripForm(null);
 $('#importBtn2').onclick=()=>$('#fileIn').click();
@@ -828,32 +880,50 @@ let sync={state:sb?'idle':'off',at:null,msg:''};
 const pushTimers=new Map();
 function setSync(state,msg){sync={state,at:state==='ok'?new Date():sync.at,msg:msg||''};if(tab==='account')renderAccount()}
 function schedulePush(t){if(!sb||!user)return;clearTimeout(pushTimers.get(t.id));pushTimers.set(t.id,setTimeout(()=>pushTrip(t),1200))}
-async function pushTrip(t){
-  if(!sb||!user)return;setSync('busy');
-  const{error}=await sb.from('trips').upsert({id:t.id,user_id:user.id,data:t,updated_at:new Date(t.updated).toISOString(),deleted:false});
+async function pushTrip(t,now){
+  if(!sb||!user)return;const role=roleOf(t);if(role==='viewer')return;
+  if(!now&&pushTimers.has(t.id))clearTimeout(pushTimers.get(t.id));
+  setSync('busy');let error;
+  if(role==='owner'){
+    t.ownerId=user.id;t.ownerName=user.name||'';t.ownerEmail=user.email;
+    ({error}=await sb.from('trips').upsert({id:t.id,user_id:user.id,data:cleanTrip(t),updated_at:new Date(t.updated).toISOString(),deleted:false}));
+  } else {
+    ({error}=await sb.from('trips').update({data:cleanTrip(t),updated_at:new Date(t.updated).toISOString()}).eq('id',t.id));
+  }
   error?setSync('err',error.message):setSync('ok');
 }
 async function pushDelete(id){
-  if(!sb||!user)return;const{error}=await sb.from('trips').upsert({id,user_id:user.id,data:{},updated_at:new Date().toISOString(),deleted:true});
+  if(!sb||!user)return;const{error}=await sb.from('trips').update({data:{},updated_at:new Date().toISOString(),deleted:true}).eq('id',id).eq('user_id',user.id);
   if(!error)S.deleted=S.deleted.filter(x=>x!==id),save();
 }
 async function pull(){
   if(!sb||!user)return;setSync('busy');
-  const{data,error}=await sb.from('trips').select('id,data,updated_at,deleted');
+  const{data,error}=await sb.from('trips').select('id,user_id,data,updated_at,deleted');
   if(error){setSync('err',error.message);return}
+  const sh=await sb.from('trip_shares').select('trip_id,email,role');
+  const shares=sh.error?[]:sh.data, me=user.email.toLowerCase();
   const remote=new Map(data.map(r=>[r.id,r]));
+  const roles={},members={};
+  for(const r of data){
+    roles[r.id]=r.user_id===user.id?'owner':(shares.find(s=>s.trip_id===r.id&&s.email.toLowerCase()===me)?.role||'viewer');
+    if(roles[r.id]==='owner')members[r.id]=shares.filter(s=>s.trip_id===r.id).map(s=>({email:s.email,role:s.role}));
+  }
+  // trips shared with me that I no longer have access to
+  S.trips=S.trips.filter(t=>!(S.roles[t.id]&&S.roles[t.id]!=='owner'&&!remote.has(t.id)));
+  S.roles=roles;S.members=members;
   for(const r of data){
     const i=S.trips.findIndex(t=>t.id===r.id);
     if(r.deleted){if(i>=0)S.trips.splice(i,1);continue}
     const rt=normTrip(r.data);
     if(i<0){if(!S.deleted.includes(r.id))S.trips.push(rt)}else if((rt.updated||0)>(S.trips[i].updated||0))S.trips[i]=rt;
   }
-  const ups=S.trips.filter(t=>{const r=remote.get(t.id);return !r||(!r.deleted&&(t.updated||0)>(r.data?.updated||0))});
   for(const id of [...S.deleted])await pushDelete(id);
-  if(ups.length){const{error:e2}=await sb.from('trips').upsert(ups.map(t=>({id:t.id,user_id:user.id,data:t,updated_at:new Date(t.updated).toISOString(),deleted:false})));if(e2){setSync('err',e2.message);return}}
+  const ups=S.trips.filter(t=>{const r=remote.get(t.id);if(!r)return roleOf(t)==='owner';return !r.deleted&&roleOf(t)!=='viewer'&&(t.updated||0)>(r.data?.updated||0)});
+  for(const t of ups)await pushTrip(t,true);
   if(!S.trips.find(t=>t.id===S.current))S.current=S.trips[0]?.id||null;
-  save();setSync('ok');renderAll();
+  save();setSync(sync.state==='err'?'err':'ok',sync.msg);renderAll();
 }
+setInterval(()=>{if(user&&document.visibilityState==='visible')pull()},60000);
 async function onSignedIn(sessionUser){
   user={id:sessionUser.id,email:sessionUser.email,name:sessionUser.user_metadata?.name||'',since:sessionUser.created_at||''};
   loadState();filter='all';closeDetail();renderAll();await pull();
