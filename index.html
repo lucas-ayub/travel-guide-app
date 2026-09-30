@@ -616,7 +616,7 @@ async function wikidata(qid){
 const NOT_PHOTO=/\b(map|maps|plan|plans|logo|coat of arms|arms|diagram|drawing|sketch|stamp|coin|banknote|poster|plaque|seal|flag|icon|floor|blueprint|engraving|lithograph|etching|postcard|document|scan|text|screenshot|chart|model)\b/i;
 const stripHtml=s=>String(s||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
 async function commonsFiles(params){
-  const j=await q(CM,{action:'query',prop:'imageinfo',iiprop:'url|mime|size|extmetadata',iiextmetadatafilter:'Artist|LicenseShortName',iiurlwidth:1400,...params});
+  const j=await q(CM,{action:'query',prop:'imageinfo',iiprop:'url|mime|size|extmetadata',iiextmetadatafilter:'Artist|LicenseShortName',iiurlwidth:1280,...params});
   return Object.values(j?.query?.pages||{}).sort((a,b)=>(a.index||0)-(b.index||0)).map(pg=>{const ii=pg.imageinfo?.[0];if(!ii)return null;
     return{title:pg.title||'',mime:ii.mime||'',w:ii.width||0,h:ii.height||0,tw:ii.thumbwidth||ii.width,th:ii.thumbheight||ii.height,src:ii.thumburl||ii.url,page:ii.descriptionurl,by:stripHtml(ii.extmetadata?.Artist?.value).slice(0,80),lic:stripHtml(ii.extmetadata?.LicenseShortName?.value)}}).filter(Boolean);
 }
@@ -663,9 +663,10 @@ function pump(){
   }
 }
 // Smaller Commons thumbnails for lists and cards
-const sized=(src,w)=>src?src.replace(/\/(\d+)px-([^/]+)$/,(m,_,f)=>`/${w}px-${f}`):'';
-const photoOf=(p,w=400)=>sized(INFO[infoKey(p)]?.photos?.[0]?.src||'',w);
-function coverOf(t){for(const p of t.places){const s=photoOf(p,1000);if(s)return s}return ''}
+// Commons serves standard widths (330, 500, 960, 1280, 1920…); drop tracking params.
+const sized=(src,w)=>src?src.replace(/\/(\d+)px-([^/?]+)(\?.*)?$/,(m,_,f)=>`/${w}px-${f}`):'';
+const photoOf=(p,w=330)=>sized(INFO[infoKey(p)]?.photos?.[0]?.src||'',w);
+function coverOf(t){for(const p of t.places){const s=photoOf(p,960);if(s)return s}return ''}
 let hubTimer=null;
 function onInfo(p){
   const th=document.querySelector(`.item[data-id="${p.id}"] .thumb`);const src=photoOf(p);
@@ -768,7 +769,7 @@ function renderDetail(p){
   const t=trip(),g=groupOf(t,p),inf=INFO[infoKey(p)],name=encodeURIComponent(p.name);
   const boxR=Math.min(innerWidth,700)/Math.min(300,innerHeight*0.38);
   const photos=inf?(inf.photos.length?inf.photos.map((ph,i)=>{const r=ph.tw&&ph.th?ph.tw/ph.th:boxR;const cover=Math.abs(r-boxR)/boxR<0.3;
-      return `<button class="slide${cover?' cover':''}" data-ph="${i}" aria-label="Open photo ${i+1}"><span class="bg" style="background-image:url('${esc(sized(ph.src,300))}')"></span><img src="${esc(ph.src)}" alt="${esc(p.name)}" ${i?'loading="lazy"':''}></button>`}).join('')
+      return `<button class="slide${cover?' cover':''}" data-ph="${i}" aria-label="Open photo ${i+1}"><span class="bg" style="background-image:url('${esc(sized(ph.src,330))}')"></span><img src="${esc(ph.src)}" alt="${esc(p.name)}" ${i?'loading="lazy"':''}></button>`}).join('')
     :`<div class="ph">No photos found for this place</div>`):`<div class="ph">Loading photos…</div>`;
   $('#detailScroll').innerHTML=`
     <div class="hero-photo"><div class="strip" id="strip">${photos}</div>${inf?.photos?.length?`<span class="zoom-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Tap to view</span>`:''}${inf?.photos?.length>1?`<span class="count" id="phCount">1 / ${inf.photos.length}</span>`:''}</div>
