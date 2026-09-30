@@ -405,7 +405,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=8"></script>
+<script src="config.js?v=9"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -594,7 +594,14 @@ function dist(p){
 
 /* ================= Photos (Wikipedia + Commons) ================= */
 const WP='https://en.wikipedia.org/w/api.php',CM='https://commons.wikimedia.org/w/api.php';
-const q=(base,params)=>fetch(base+'?'+new URLSearchParams({format:'json',origin:'*',...params})).then(r=>r.json());
+async function q(base,params,tries=3){
+  for(let i=0;;i++){
+    try{const r=await fetch(base+'?'+new URLSearchParams({format:'json',origin:'*',maxlag:5,...params}));
+      if(r.status===429||r.status>=500)throw new Error('busy '+r.status);
+      const j=await r.json();if(j?.error?.code==='maxlag')throw new Error('maxlag');return j}
+    catch(e){if(i>=tries-1)throw e;await new Promise(res=>setTimeout(res,600*(i+1)+Math.random()*400))}
+  }
+}
 const norm=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!['the','and','church','copenhagen','malmo','museum'].includes(w));
 const similar=(a,b)=>{const B=new Set(norm(b));return norm(a).filter(w=>B.has(w)).length};
 const km=(a,b,c,d)=>{const r=x=>x*Math.PI/180,x=(r(d)-r(b))*Math.cos(r((a+c)/2)),y=r(c)-r(a);return Math.sqrt(x*x+y*y)*6371};
@@ -606,7 +613,7 @@ async function wpPage(title){
 async function findArticle(p){
   if(p.wiki){const a=await wpPage(p.wiki);if(a)return a}
   const s=await q(WP,{action:'query',list:'search',srsearch:p.name,srlimit:4});
-  for(const h of(s?.query?.search||[])){const a=await wpPage(h.title);if(a&&a.coords&&km(p.lat,p.lon,a.coords.lat,a.coords.lon)<1.5)return a}
+  for(const h of(s?.query?.search||[])){if(!similar(p.name,h.title))continue;const a=await wpPage(h.title);if(a&&a.coords&&km(p.lat,p.lon,a.coords.lat,a.coords.lon)<1.5)return a}
   const g=await q(WP,{action:'query',list:'geosearch',gscoord:`${p.lat}|${p.lon}`,gsradius:400,gslimit:15});
   let best=null,bs=0;for(const h of(g?.query?.geosearch||[])){const sc=similar(p.name,h.title);if(sc>bs){bs=sc;best=h}}
   return best?wpPage(best.title):null;
@@ -635,7 +642,7 @@ const LANGS=['de','fr','es','it','nl','sv','da','nb','pt','pl','ja','ru','fi','c
 async function consensusFiles(enTitle){
   const j=await q(WP,{action:'query',titles:enTitle,redirects:1,prop:'langlinks|images',lllimit:'max',imlimit:'max'});
   const pg=Object.values(j?.query?.pages||{})[0]||{};
-  const links=(pg.langlinks||[]).filter(l=>LANGS.includes(l.lang)).slice(0,14);
+  const links=(pg.langlinks||[]).filter(l=>LANGS.includes(l.lang)).slice(0,10);
   const counts=new Map();const bump=t=>{const f=t.replace(/^[^:]+:/,'').replace(/_/g,' ');if(/\.(jpe?g|webp)$/i.test(f))counts.set(f,(counts.get(f)||0)+1)};
   (pg.images||[]).forEach(i=>bump(i.title));
   await Promise.all(links.map(async l=>{try{const r=await q(`https://${l.lang}.wikipedia.org/w/api.php`,{action:'query',titles:l['*'],redirects:1,prop:'images',imlimit:'max'});(Object.values(r?.query?.pages||{})[0]?.images||[]).forEach(i=>bump(i.title))}catch(e){}}));
@@ -649,14 +656,14 @@ async function wikidata(qid){
 async function wikimediaPhotos(p,art){
   if(!art){
     // No article: only nearby photos whose file name names the place. Better none than random ones.
-    const near=await commonsFiles({generator:'geosearch',ggscoord:`${p.lat}|${p.lon}`,ggsradius:200,ggsnamespace:6,ggslimit:40}).catch(()=>[]);
+    const near=await commonsFiles({generator:'geosearch',ggscoord:`${p.lat}|${p.lon}`,ggsradius:200,ggsnamespace:6,ggslimit:40});
     return near.filter(goodPhoto).filter(f=>similar(p.name,f.title)>0).sort((a,b)=>similar(p.name,b.title)-similar(p.name,a.title)).slice(0,6);
   }
-  const [cons,wd]=await Promise.all([consensusFiles(art.title).catch(()=>[]),art.qid?wikidata(art.qid).catch(()=>null):null]);
+  const [cons,wd]=await Promise.all([consensusFiles(art.title),art.qid?wikidata(art.qid).catch(()=>null):null]);
   const lead=(wd?.images||[]).map(f=>f.replace(/_/g,' '));
   const ranked=[...lead,...cons.filter(x=>x.c>=2||cons.length<6).map(x=>x.f)].filter((f,i,a)=>a.indexOf(f)===i).slice(0,18);
   if(!ranked.length)return [];
-  const info=await commonsFiles({titles:ranked.map(f=>'File:'+f).join('|')}).catch(()=>[]);
+  const info=await commonsFiles({titles:ranked.map(f=>'File:'+f).join('|')});
   const byName=new Map(info.map(f=>[f.title,f]));
   return ranked.map(f=>byName.get(f)).filter(Boolean).filter(goodPhoto).slice(0,8);
 }
@@ -678,19 +685,19 @@ async function googlePhotos(p){
   return pl.photos.slice(0,8).map(ph=>({src:ph.getURI({maxWidth:1600}),page:ph.authorAttributions?.[0]?.uri||'',by:ph.authorAttributions?.[0]?.displayName||'',lic:'Google Maps',tw:ph.widthPx,th:ph.heightPx,g:1}));
 }
 async function findPhotos(p,art){
-  const [g,w]=await Promise.all([googlePhotos(p).catch(()=>[]),wikimediaPhotos(p,art).catch(()=>[])]);
+  const [g,w]=await Promise.all([googlePhotos(p).catch(()=>[]),wikimediaPhotos(p,art)]);
   return (g.length?[...g.slice(0,6),...w.slice(0,3)]:w).map(({title,mime,w,h,year,...f})=>({...f,id:title||f.src}));
 }
 const infoKey=p=>`${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}|${p.wiki||''}|${p.name}`;
 const pending=new Map(),queue=[];let running=0;
 function ensureInfo(p){const k=infoKey(p);if(INFO[k])return Promise.resolve(INFO[k]);if(pending.has(k))return pending.get(k);const pr=new Promise(res=>queue.push({p,k,res}));pending.set(k,pr);pump();return pr}
 function pump(){
-  while(running<3&&queue.length){
+  while(running<2&&queue.length){
     const{p,k,res}=queue.shift();running++;
     (async()=>{
       let out={photos:[],extract:'',title:''},ok=false;
       try{
-        const art=await findArticle(p).catch(()=>null);
+        const art=await findArticle(p);
         const photos=await findPhotos(p,art);
         out={photos,extract:art?.extract||'',title:art?.title||''};INFO[k]=out;store('atlas.info.v3',INFO);ok=true;
       }catch(e){}
