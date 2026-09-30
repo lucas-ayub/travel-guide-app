@@ -14,8 +14,9 @@
 <title>Trip Atlas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
 /* Layout: three tabs over one living map. Trips (hub) and Account are opaque panels; the Map tab reveals the map with glass bars, a list sheet and a place card. */
 :root{
@@ -26,6 +27,7 @@
   --body:"Figtree", -apple-system, "SF Pro Text", system-ui, sans-serif;
   --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
   --tabh:calc(62px + var(--sb));
+  --gap:0px; /* set by fitViewport(): how far the page stops short of the screen bottom (iOS home screen apps) */
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
@@ -43,7 +45,7 @@ svg{display:block}
 [hidden]{display:none!important}
 
 /* ---------- Map ---------- */
-#map{position:fixed;inset:0;background:var(--bg);-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+#map{position:fixed;inset:0 0 calc(0px - var(--gap,0px));background:var(--bg);-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
 .maplibregl-ctrl-attrib{font-size:10px}
 .maplibregl-ctrl-bottom-right{bottom:calc(var(--tabh) + 92px)}
 body.sheet-open .maplibregl-ctrl-bottom-right{bottom:calc(var(--tabh) + 50vh)}
@@ -73,15 +75,15 @@ body[data-tab="map"] .map-ui{display:block}
 .chip{flex:none;border:0;border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;white-space:nowrap;box-shadow:var(--shadow-s)}
 .chip i{width:9px;height:9px;border-radius:50%;background:var(--c)}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
-.fabs{position:fixed;right:12px;z-index:18;display:flex;flex-direction:column;gap:10px;bottom:calc(var(--tabh) + 96px);transition:bottom .28s}
-body.sheet-open .fabs{bottom:calc(var(--tabh) + 50vh + 12px)}
+.fabs{position:fixed;right:12px;z-index:18;display:flex;flex-direction:column;gap:10px;bottom:calc(var(--tabh) + 96px - var(--gap,0px));transition:bottom .28s}
+body.sheet-open .fabs{bottom:calc(var(--tabh) + 50vh + 12px - var(--gap,0px))}
 .fab{width:52px;height:52px;border-radius:18px;border:0;display:grid;place-items:center}
 .fab svg{width:24px;height:24px}
 .fab.primary{background:linear-gradient(160deg,var(--accent-2),var(--accent));color:#fff;box-shadow:0 10px 24px rgba(240,69,43,.4)}
 .fab.live{color:#2F7DE1}
 
 /* list sheet */
-.sheet{position:fixed;left:0;right:0;bottom:var(--tabh);z-index:19;background:var(--surface);border-radius:24px 24px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.12);display:flex;flex-direction:column;height:84px;transition:height .28s ease}
+.sheet{position:fixed;left:0;right:0;bottom:calc(var(--tabh) - var(--gap,0px));z-index:19;background:var(--surface);border-radius:24px 24px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.12);display:flex;flex-direction:column;height:84px;transition:height .28s ease}
 body.sheet-open .sheet{height:50vh}
 .sheet-head{border:0;background:none;padding:8px 18px 10px;text-align:left;display:flex;flex-direction:column;gap:6px;width:100%}
 .grab{width:40px;height:5px;border-radius:3px;background:var(--line);align-self:center}
@@ -102,7 +104,7 @@ body.sheet-open .sheet{height:50vh}
 .empty{padding:22px 16px;color:var(--muted);text-align:center}
 
 /* place card */
-.detail{position:fixed;left:0;right:0;bottom:var(--tabh);z-index:40;height:calc(100vh - var(--tabh) - var(--st) - 74px);background:var(--surface);border-radius:24px 24px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.3);transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+.detail{position:fixed;left:0;right:0;top:calc(var(--st) + 74px);bottom:calc(var(--tabh) - var(--gap,0px));z-index:40;background:var(--surface);border-radius:24px 24px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.3);transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
 .detail.show{transform:none}
 .detail .scroll{overflow-y:auto;flex:1;padding-bottom:24px;-webkit-overflow-scrolling:touch}
 .hero-photo{position:relative;height:min(300px,38vh);background:var(--surface-2);border-radius:24px 24px 0 0;overflow:hidden}
@@ -116,7 +118,7 @@ body.sheet-open .sheet{height:50vh}
 .hero-photo .zoom-hint{position:absolute;left:14px;bottom:14px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;display:flex;gap:5px;align-items:center;pointer-events:none}
 .hero-photo .zoom-hint svg{width:13px;height:13px}
 /* full-screen viewer */
-.lb{position:fixed;inset:0;z-index:100;background:#000;display:flex;flex-direction:column;color:#fff}
+.lb{position:fixed;inset:0 0 calc(0px - var(--gap,0px));z-index:100;background:#000;display:flex;flex-direction:column;color:#fff}
 .lb-top{display:flex;justify-content:space-between;align-items:center;padding:calc(var(--st) + 10px) 14px 10px;font-weight:600;font-variant-numeric:tabular-nums}
 .lb-top button{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center}
 .lb-top svg{width:18px;height:18px}
@@ -155,7 +157,7 @@ body.sheet-open .sheet{height:50vh}
 .credit{font-size:12px;color:var(--muted)}
 
 /* ---------- Panels (Trips, Account) ---------- */
-.panel{position:fixed;inset:0;z-index:30;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--st) + 14px) 18px calc(var(--tabh) + 28px);display:none}
+.panel{position:fixed;inset:0 0 calc(0px - var(--gap,0px));z-index:30;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--st) + 14px) 18px calc(var(--tabh) + 28px);display:none}
 body[data-tab="trips"] #view-trips,body[data-tab="account"] #view-account{display:block}
 .wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
 .stack{display:flex;flex-direction:column;gap:12px}
@@ -227,16 +229,31 @@ body[data-tab="trips"] #view-trips,body[data-tab="account"] #view-account{displa
 .signed svg{width:16px;height:16px}
 .steps{margin:0;padding-left:20px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
 .steps code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-size:13px}
+.remember{display:flex;align-items:center;gap:12px;background:var(--surface-2);border-radius:14px;padding:11px 12px 11px 14px;cursor:pointer}
+.remember .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.remember b{font-weight:600}
+.remember small{font-size:12.5px;line-height:1.35;color:var(--muted)}
+.switch{-webkit-appearance:none;appearance:none;flex:none;width:51px;height:31px;margin:0;border-radius:999px;background:color-mix(in srgb,var(--muted) 38%,transparent);position:relative;cursor:pointer;transition:background .2s}
+.switch::after{content:"";position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.25);transition:transform .2s}
+.switch:checked{background:var(--good)}
+.switch:checked::after{transform:translateX(20px)}
+.foot{margin:0;text-align:center;font-size:12px;color:var(--muted)}
+/* until the app has started, show only the brand: the plain page would look signed out and empty */
+.boot{display:none;margin:0;color:var(--muted)}
+body.booting .boot{display:block}
+body.booting .greet,body.booting #heroSlot,body.booting #upSec,body.booting #pastSec{display:none}
+body.booting #hubAvatar{visibility:hidden}
 
 /* ---------- Tab bar ---------- */
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:space-around;padding:6px 8px var(--sb);height:var(--tabh);border-top:1px solid var(--line)}
+.tabs{position:fixed;left:0;right:0;bottom:calc(0px - var(--gap,0px));z-index:50;display:flex;justify-content:space-around;padding:6px 8px var(--sb);height:var(--tabh);border-top:1px solid var(--line)}
 .tabs button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:600;padding-top:4px}
 .tabs svg{width:25px;height:25px}
 .tabs button[aria-selected="true"]{color:var(--accent)}
 
 /* ---------- Dialogs ---------- */
 dialog{border:0;padding:0;border-radius:24px;background:var(--surface);color:var(--ink);width:min(560px,calc(100vw - 20px));max-height:calc(100vh - var(--st) - var(--sb) - 30px);box-shadow:var(--shadow)}
-dialog::backdrop{background:var(--scrim)}
+dialog:modal{bottom:calc(0px - var(--gap,0px))}
+dialog::backdrop{background:var(--scrim);bottom:calc(0px - var(--gap,0px))}
 .dlg{display:flex;flex-direction:column;max-height:inherit}
 .dlg header{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 8px}
 .dlg header h3{margin:0;font:700 21px var(--display)}
@@ -268,7 +285,7 @@ textarea{min-height:84px;resize:vertical}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
-<body data-tab="trips">
+<body data-tab="trips" class="booting">
 <div id="map" aria-label="Map"></div>
 
 <!-- ============ Map chrome ============ -->
@@ -311,6 +328,7 @@ textarea{min-height:84px;resize:vertical}
 <main class="panel" id="view-trips">
   <div class="wrap">
     <div class="brand"><img src="logo.svg" alt=""><b>Trip Atlas</b><span class="grow"></span><button class="avatar" id="hubAvatar" aria-label="Account">?</button></div>
+    <p class="boot" id="bootMsg" role="status">Loading your trips…</p>
     <div class="greet"><h1 id="greet">Where to next?</h1><p id="greetSub"></p></div>
     <div id="heroSlot"></div>
     <section class="stack" id="upSec">
@@ -406,9 +424,10 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
+<script>setTimeout(function(){if(document.body.classList.contains('booting')){var m=document.getElementById('bootMsg');if(m)m.textContent='Trip Atlas is taking longer than usual to open. Check your connection, then close and reopen the app.'}},12000)</script>
 <script src="config.js?v=16"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 "use strict";
 /* ================= Basics ================= */
@@ -417,7 +436,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
 const load=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
-const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}};
 const ICON={
   x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
@@ -480,12 +499,47 @@ function blankTrip(name,start,end){return{id:uid(),name,start:start||'',end:end|
 
 /* ================= State ================= */
 const CFG=window.ATLAS_CONFIG||{};
-const sb=(CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase)?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}}):null;
+const BUILD='1 Oct 2026';
+const HAS_AUTH=!!(CFG.supabaseUrl&&CFG.supabaseAnonKey);
+/* Where the sign-in lives. "Keep me signed in" on: localStorage, which survives closing the app.
+   Off: sessionStorage, which the phone clears when the app is closed. */
+const REMEMBER='atlas.remember';
+const remembering=()=>{try{return localStorage.getItem(REMEMBER)!=='0'}catch(e){return true}};
+const AUTH_KEY=HAS_AUTH?'sb-'+new URL(CFG.supabaseUrl).hostname.split('.')[0]+'-auth-token':'';
+const authStorage={
+  getItem(k){try{return localStorage.getItem(k)??sessionStorage.getItem(k)}catch(e){return null}},
+  setItem(k,v){
+    const put=s=>{try{s.setItem(k,v);return true}catch(e){return false}},drop=s=>{try{s.removeItem(k)}catch(e){}};
+    if(!remembering()){put(sessionStorage);drop(localStorage);return}
+    // a full storage must never cost the login: clear the photo cache and try again
+    if(put(localStorage)||(dropPhotoCache(),put(localStorage)))drop(sessionStorage);else put(sessionStorage);
+  },
+  removeItem(k){try{localStorage.removeItem(k)}catch(e){}try{sessionStorage.removeItem(k)}catch(e){}}
+};
+function setRemember(on){
+  try{localStorage.setItem(REMEMBER,on?'1':'0')}catch(e){}
+  const s=authStorage.getItem(AUTH_KEY);if(s)authStorage.setItem(AUTH_KEY,s);   // move the saved session to the matching storage
+  try{if(on&&user?.email)localStorage.setItem('atlas.lastEmail',user.email);else if(!on)localStorage.removeItem('atlas.lastEmail')}catch(e){}
+}
+/* One app window, so an in-page queue replaces the browser's Web Locks, which can stall in iPhone home screen apps.
+   A zero timeout means "only if free" (the background token refresh), as with Web Locks. */
+let lockTail=Promise.resolve(),lockUsers=0;
+async function authLock(name,timeout,fn){
+  if(timeout===0&&lockUsers){const e=new Error('auth lock busy');e.isAcquireTimeout=true;throw e}
+  lockUsers++;const prev=lockTail;let done;lockTail=new Promise(r=>done=r);
+  try{await prev;return await fn()}finally{lockUsers--;done()}
+}
+const sb=(HAS_AUTH&&window.supabase)?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit',storage:authStorage,storageKey:AUTH_KEY,lock:authLock}}):null;
 let user=null;                 // {id,email,name}
+let authed=false;              // Supabase confirmed the session in this launch; until then the saved account is shown (e.g. offline)
 let S=null;                    // {trips,current,prefs}
 let tab='trips', filter='all', selected=null;
 const keyFor=u=>'atlas.v2.'+(u?u.id:'guest');
 let INFO=load('atlas.info.v6')||{};
+['atlas.info.v1','atlas.info.v2','atlas.info.v3','atlas.info.v4','atlas.info.v5'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}}); // photo caches of older versions
+// The photo cache must never fill the storage the login lives in: halve it when a write fails.
+function saveInfo(){if(store('atlas.info.v6',INFO))return;const ks=Object.keys(INFO);ks.slice(0,Math.ceil(ks.length/2)).forEach(k=>delete INFO[k]);store('atlas.info.v6',INFO)}
+function dropPhotoCache(){INFO={};try{localStorage.removeItem('atlas.info.v6')}catch(e){}}
 
 const roleOf=t=>(!user||!t)?'owner':(S.roles?.[t.id]||'owner');
 const canEdit=t=>roleOf(t)!=='viewer';
@@ -577,6 +631,7 @@ function fitAll(animate=true){
 let me=null,meMarker=null,watchId=null,firstFix=false;
 function startLocate(){
   if(!('geolocation' in navigator)){toast('This browser does not support location.');return}
+  if(!map){toast('The map is not available right now.');return}
   if(watchId!==null){ if(me) map.easeTo({center:[me.lon,me.lat],zoom:Math.max(map.getZoom(),15)}); return }
   firstFix=true; toast('Finding your location…');
   watchId=navigator.geolocation.watchPosition(pos=>{
@@ -660,7 +715,7 @@ async function wikiBits(art){
   const counts=new Map();const bump=t=>{const f=t.replace(/^[^:]+:/,'').replace(/_/g,' ');if(/\.(jpe?g|webp)$/i.test(f))counts.set(f,(counts.get(f)||0)+1)};
   (pg.images||[]).forEach(i=>bump(i.title));
   const [wd]=await Promise.all([art.qid?wikidata(art.qid).catch(()=>null):null,
-    ...links.map(async l=>{try{const r=await q(`https://${l.lang}.wikipedia.org/w/api.php`,{action:'query',titles:l['*'],redirects:1,prop:'images',imlimit:'max'});(Object.values(r?.query?.pages||{})[0]?.images||[]).forEach(i=>bump(i.title))}catch(e){}})]);
+    ...links.map(async l=>{try{const r=await q(`https://${l.lang==='nb'?'no':l.lang}.wikipedia.org/w/api.php`,{action:'query',titles:l['*'],redirects:1,prop:'images',imlimit:'max'});(Object.values(r?.query?.pages||{})[0]?.images||[]).forEach(i=>bump(i.title))}catch(e){}})]);
   const names=[...new Set([art.title.replace(/\s*\(.*\)$/,''),...all.filter(l=>NAME_LANGS.includes(l.lang)).map(l=>l['*'].replace(/\s*\(.*\)$/,''))])];
   return{cons:[...counts].sort((a,b)=>b[1]-a[1]).map(([f,c])=>({f,c})),lead:(wd?.images||[]).map(f=>f.replace(/_/g,' ')),cat:wd?.cat||'',names};
 }
@@ -773,7 +828,7 @@ function pump(){
       try{
         const art=await findArticle(p);
         const photos=await findPhotos(p,art);
-        out={photos:[...photos],extract:art?.extract||'',title:art?.title||'',...(photos.partial?{partial:Date.now()}:{})};INFO[k]=out;store('atlas.info.v6',INFO);ok=true;
+        out={photos:[...photos],extract:art?.extract||'',title:art?.title||'',...(photos.partial?{partial:Date.now()}:{})};INFO[k]=out;saveInfo();ok=true;
       }catch(e){}
       pending.delete(k);running--;res(out);pump();if(ok)onInfo(p);
     })();
@@ -881,7 +936,7 @@ function openDetail(id){
   const t=trip(),p=t?.places.find(x=>x.id===id);if(!p)return;
   selected=id;renderMarkers();renderDetail(p);
   $('#detail').classList.add('show');$('#detail').setAttribute('aria-hidden','false');$('#detailScroll').scrollTop=0;
-  map.easeTo({center:[p.lon,p.lat],zoom:Math.max(map.getZoom(),15),offset:[0,-innerHeight*0.3],duration:600});
+  map?.easeTo({center:[p.lon,p.lat],zoom:Math.max(map.getZoom(),15),offset:[0,-innerHeight*0.3],duration:600});
   ensureInfo(p);
 }
 function closeDetail(){$('#detail').classList.remove('show');$('#detail').setAttribute('aria-hidden','true');if(selected){selected=null;renderMarkers()}}
@@ -960,9 +1015,9 @@ function openPlaceForm(p,at){
 }
 async function searchPlaces(){
   const text=$('#pfQ').value.trim();if(!text)return;const ul=$('#pfResults');ul.innerHTML='<li class="hint">Searching…</li>';
-  const c=map.getCenter();
+  const c=map?.getCenter();
   try{
-    const r=await(await fetch('https://photon.komoot.io/api/?'+new URLSearchParams({q:text,limit:6,lat:c.lat,lon:c.lng,lang:'en'}))).json();
+    const r=await(await fetch('https://photon.komoot.io/api/?'+new URLSearchParams({q:text,limit:6,...(c?{lat:c.lat,lon:c.lng}:{}),lang:'en'}))).json();
     const res=(r.features||[]).map(f=>{const pr=f.properties;return{name:pr.name||pr.street||text,sub:[pr.street&&pr.housenumber?pr.street+' '+pr.housenumber:pr.street,pr.city,pr.country].filter(Boolean).join(', '),lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0]}});
     if(!res.length){ul.innerHTML='<li class="hint">Nothing found. Try the English or local name.</li>';return}
     ul.innerHTML=res.map((x,i)=>`<li><button type="button" data-i="${i}">${esc(x.name)}<small>${esc(x.sub)}</small></button></li>`).join('');
@@ -971,7 +1026,7 @@ async function searchPlaces(){
 }
 $('#pfSearch').onclick=searchPlaces;
 $('#pfQ').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchPlaces()}});
-$('#pfCenter').onclick=()=>{const c=map.getCenter();picked={lat:c.lat,lon:c.lng};showPicked()};
+$('#pfCenter').onclick=()=>{if(!map)return;const c=map.getCenter();picked={lat:c.lat,lon:c.lng};showPicked()};
 $('#pfHere').onclick=()=>{if(me){picked={...me};showPicked()}else{startLocate();toast('Turning on location; tap again in a few seconds.')}};
 $('#placeForm').addEventListener('submit',e=>{
   e.preventDefault();const t=trip(),name=$('#pfName').value.trim();
@@ -1001,7 +1056,7 @@ function openTripForm(t){
   $('#tfTitle').textContent=!t?'Plan a new trip':role==='owner'?'Trip settings':`Shared by ${t.ownerName||t.ownerEmail||'another traveller'}`;
   $('#shareSec').hidden=!t||role!=='owner';
   renderShare();renderGroupEd();$('#tripDlg').showModal();if(!t)setTimeout(()=>$('#tfName').focus(),60);
-  if(t&&role==='owner'&&sb&&user) loadMembers(t.id);
+  if(t&&role==='owner'&&sb&&user&&authed) loadMembers(t.id);
 }
 async function loadMembers(id){const{data}=await sb.from('trip_shares').select('email,role').eq('trip_id',id);if(data){S.members[id]=data;save();if(tEditing?.id===id)renderShare()}}
 function renderShare(){
@@ -1017,6 +1072,7 @@ function renderShare(){
 }
 $('#shAdd').onclick=async()=>{
   const t=tEditing,email=$('#shEmail').value.trim().toLowerCase(),role=$('#shRole').value;
+  if(!authed){toast(navigator.onLine===false?'You are offline. Invite them when you are connected.':'Still connecting to your account. Try again in a moment.');return}
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast('Type a valid email.');return}
   if(email===user.email.toLowerCase()){toast('That is your own email.');return}
   $('#shAdd').disabled=true;$('#shAdd').textContent='Inviting…';
@@ -1045,7 +1101,7 @@ $('#tripForm').addEventListener('submit',e=>{
 });
 $('#delTrip').onclick=async()=>{const b=$('#delTrip'),owner=roleOf(tEditing)==='owner';if(!b.dataset.arm){b.dataset.arm='1';b.textContent=owner?'Tap again to delete':'Tap again to leave';return}
   const id=tEditing.id;
-  if(!owner){const{error}=await sb.from('trip_shares').delete().eq('trip_id',id).eq('email',user.email.toLowerCase());if(error){toast('Could not leave: '+error.message);return}delete S.roles[id]}
+  if(!owner){if(!authed){toast('Connect to the internet to leave this trip.');return}const{error}=await sb.from('trip_shares').delete().eq('trip_id',id).eq('email',user.email.toLowerCase());if(error){toast('Could not leave: '+error.message);return}delete S.roles[id]}
   else{S.deleted.push(id);pushDelete(id)}
   S.trips=S.trips.filter(x=>x.id!==id);if(S.current===id)S.current=S.trips[0]?.id||null;save();
   $('#tripDlg').close();closeDetail();setTab('trips');renderAll();toast(owner?'Trip deleted':'You left the trip')};
@@ -1092,7 +1148,7 @@ const pushTimers=new Map();
 function setSync(state,msg){sync={state,at:state==='ok'?new Date():sync.at,msg:msg||''};if(tab==='account')renderAccount()}
 function schedulePush(t){if(!sb||!user)return;clearTimeout(pushTimers.get(t.id));pushTimers.set(t.id,setTimeout(()=>pushTrip(t),1200))}
 async function pushTrip(t,now){
-  if(!sb||!user)return;const role=roleOf(t);if(role==='viewer')return;
+  if(!sb||!user||!authed)return;const role=roleOf(t);if(role==='viewer')return;
   if(!now&&pushTimers.has(t.id))clearTimeout(pushTimers.get(t.id));
   setSync('busy');let error;
   if(role==='owner'){
@@ -1104,11 +1160,13 @@ async function pushTrip(t,now){
   error?setSync('err',error.message):setSync('ok');
 }
 async function pushDelete(id){
-  if(!sb||!user)return;const{error}=await sb.from('trips').update({data:{},updated_at:new Date().toISOString(),deleted:true}).eq('id',id).eq('user_id',user.id);
+  if(!sb||!user||!authed)return;const{error}=await sb.from('trips').update({data:{},updated_at:new Date().toISOString(),deleted:true}).eq('id',id).eq('user_id',user.id);
   if(!error)S.deleted=S.deleted.filter(x=>x!==id),save();
 }
-async function pull(){
-  if(!sb||!user)return;setSync('busy');
+let pulling=null;
+function pull(){if(!sb||!user||!authed)return Promise.resolve();return pulling||(pulling=pullNow().finally(()=>{pulling=null}))}
+async function pullNow(){
+  setSync('busy');
   const{data,error}=await sb.from('trips').select('id,user_id,data,updated_at,deleted');
   if(error){setSync('err',error.message);return}
   const sh=await sb.from('trip_shares').select('trip_id,email,role');
@@ -1135,33 +1193,48 @@ async function pull(){
   save();setSync(sync.state==='err'?'err':'ok',sync.msg);renderAll();
 }
 setInterval(()=>{if(user&&document.visibilityState==='visible')pull()},60000);
+const userFrom=u=>({id:u.id,email:u.email||'',name:u.user_metadata?.name||'',since:u.created_at||''});
 async function onSignedIn(sessionUser){
-  user={id:sessionUser.id,email:sessionUser.email,name:sessionUser.user_metadata?.name||'',since:sessionUser.created_at||''};
+  user=userFrom(sessionUser);
   loadState();filter='all';closeDetail();renderAll();await pull();
 }
-function onSignedOut(){user=null;loadState();renderAll()}
+// expired: Supabase ended the session (not the Sign out button), so the sign-in form says why
+function onSignedOut(expired){
+  const email=user?.email||'';user=null;authed=false;loadState();
+  if(email&&!authEmail)authEmail=email;
+  if(expired){authMode='signin';authOk='';authErr='You were signed out. Sign in again to sync your trips.'}
+  renderAll();
+}
 
 /* ================= Account tab ================= */
-let authMode='signup',authEmail='',authName='',authErr='',authOk='',authBusy=false,recovering=false;
-const syncLine=()=>{const m={off:['','Cloud sync is not set up'],idle:['','Not synced yet'],busy:['busy','Syncing…'],ok:['ok',`Synced ${sync.at?sync.at.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):''}`],err:['err','Sync failed: '+sync.msg]}[sync.state];return`<div class="sync ${m[0]}"><i></i>${esc(m[1])}</div>`};
+let authMode='signup',authEmail='',authName='',authErr='',authOk='',authBusy=false,recovering=false,signingOut=false,rememberPick=remembering();
+// Returning on this device: start on Sign in, with the last email filled in
+try{authEmail=localStorage.getItem('atlas.lastEmail')||'';if(authEmail||Object.keys(localStorage).some(k=>/^atlas\.v2\.[0-9a-f-]{36}$/.test(k)))authMode='signin'}catch(e){}
+const remSwitch=(id,on,hint)=>`<label class="remember" for="${id}"><span class="txt"><b>Keep me signed in</b><small>${esc(hint)}</small></span><input type="checkbox" class="switch" id="${id}" ${on?'checked':''}></label>`;
+const syncLine=()=>{
+  if(user&&!authed){const s=!sb?['err','Can’t reach your account right now · trips are saved on this device']:navigator.onLine===false?['','Offline · your trips are saved on this device']:['busy','Connecting to your account…'];return`<div class="sync ${s[0]}"><i></i>${esc(s[1])}</div>`}
+  const m={off:['','Cloud sync is not set up'],idle:['','Not synced yet'],busy:['busy','Syncing…'],ok:['ok',`Synced ${sync.at?sync.at.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):''}`],err:['err','Sync failed: '+sync.msg]}[sync.state];return`<div class="sync ${m[0]}"><i></i>${esc(m[1])}</div>`};
 function renderAccount(){
   const w=$('#accountWrap');const initials=(user?.name||user?.email||'?').trim()[0]?.toUpperCase()||'?';
   let html=`<div class="brand"><img src="logo.svg" alt=""><b>Account</b></div>`;
   if(sb&&user&&recovering) html+=`<div class="card"><h3>Choose a new password</h3><form id="newPassForm" class="stack">
       <label class="f">New password<input type="password" id="aNewPass" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters"></label>
       ${authErr?`<p class="err-msg" role="alert">${esc(authErr)}</p>`:''}<button class="btn primary">Save password</button></form></div>`;
-  if(!sb){
+  if(!HAS_AUTH){
     html+=`<div class="card"><h3>Accounts are almost ready</h3><p>To sign in and sync trips between devices, connect a free Supabase project:</p>
       <ol class="steps"><li>Create a project at supabase.com.</li><li>Run <code>setup.sql</code> in its SQL editor.</li><li>Put the project URL and anon key in <code>config.js</code>.</li></ol>
       <p>Until then, trips are saved on this device.</p></div>`;
+  } else if(!user&&!sb){
+    html+=`<div class="card"><h3>Can’t connect right now</h3><p>Trip Atlas couldn’t load its sign-in service. Check your connection, then close and reopen the app.</p></div>`;
   } else if(!user){
     const up=authMode==='signup';
     html+=`<div class="card"><h3>${up?'Create your account':'Sign in'}</h3>
       <p>${up?'Your trips will sync between your phone and computer.':'Welcome back. Your trips will sync to this device.'}</p>
       <form id="authForm" class="stack">
         ${up?`<label class="f">Name<input type="text" id="aName" autocomplete="name" required value="${esc(authName)}" placeholder="Your name"></label>`:''}
-        <label class="f">Email<input type="email" id="aEmail" autocomplete="email" required value="${esc(authEmail)}" placeholder="you@example.com"></label>
-        <label class="f">Password<input type="password" id="aPass" autocomplete="${up?'new-password':'current-password'}" required minlength="6" placeholder="${up?'At least 6 characters':'Your password'}"></label>
+        <label class="f">Email<input type="email" id="aEmail" name="email" autocomplete="email" required value="${esc(authEmail)}" placeholder="you@example.com"></label>
+        <label class="f">Password<input type="password" id="aPass" name="password" autocomplete="${up?'new-password':'current-password'}" required minlength="6" placeholder="${up?'At least 6 characters':'Your password'}"></label>
+        ${remSwitch('aRemember',rememberPick,'Stay signed in after you close the app.')}
         ${authErr?`<p class="err-msg" role="alert">${esc(authErr)}</p>`:''}
         ${authOk?`<p class="ok-msg" role="status">${esc(authOk)}</p>`:''}
         <button class="btn primary" ${authBusy?'disabled':''}>${authBusy?'One moment…':(up?'Create account':'Sign in')}</button>
@@ -1183,6 +1256,7 @@ function renderAccount(){
       ${next?`<button class="next" data-next="${next.id}"><div class="cv" style="${coverOf(next)?`background-image:url('${esc(coverOf(next))}')`:''}"></div><div class="meta"><b>${esc(next.name)}</b><span class="sub">${esc(fmtRange(next))} · ${status(next).label}</span></div></button>`:''}
       <div class="signed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Signed in on this device</div>
       ${syncLine()}
+      ${remSwitch('aKeep',remembering(),remembering()?'You stay signed in on this device, even after closing the app.':'You will be signed out when you close the app.')}
       <div class="grid-btns"><button class="btn" id="aSync">Sync now</button><button class="btn danger" id="aOut">Sign out</button></div></div>
     ${fromDevice.length?`<div class="card"><h3>Trips on this device</h3><p>${fromDevice.length} ${fromDevice.length===1?'trip was':'trips were'} saved on this phone before you signed in: ${esc(fromDevice.map(t=>t.name).join(', '))}. They stay separate unless you add them.</p><button class="btn primary" id="aAdopt">Add to my account</button></div>`:''}
     <div class="card"><h3>Profile</h3><label class="f">Display name<input type="text" id="aRename" value="${esc(user.name)}" placeholder="Your name"></label></div>`;
@@ -1190,7 +1264,8 @@ function renderAccount(){
   const ms=S.prefs.mapStyle||'auto';
   html+=`<div class="card"><h3>Map style</h3><div class="seg" id="styleSeg">${[['auto','Auto'],['liberty','Liberty'],['bright','Bright'],['positron','Light'],['dark','Dark']].map(([k,l])=>`<button data-s="${k}" aria-pressed="${ms===k}">${l}</button>`).join('')}</div><p class="hint">Auto follows your phone's light or dark mode.</p></div>
     <div class="card"><h3>Backup</h3><p>Export all trips as a file, or import a backup or a Google My Maps .kml.</p>
-      <div class="grid-btns"><button class="btn" id="aExport">Export all</button><button class="btn" id="aImport">Import</button></div></div>`;
+      <div class="grid-btns"><button class="btn" id="aExport">Export all</button><button class="btn" id="aImport">Import</button></div></div>
+    <p class="foot">Trip Atlas · updated ${BUILD}</p>`;
   w.innerHTML=html;
   $('#authForm')?.addEventListener('submit',submitAuth);
   $('#aSwitch')&&($('#aSwitch').onclick=()=>{authMode=authMode==='signup'?'signin':'signup';authErr='';authOk='';renderAccount()});
@@ -1203,11 +1278,18 @@ function renderAccount(){
     if(pw.length<6){authErr='Use at least 6 characters.';renderAccount();return}
     const{error}=await sb.auth.updateUser({password:pw});if(error){authErr=error.message;renderAccount();return}
     recovering=false;authErr='';toast('Password updated');renderAccount()});
-  $('#aOut')&&($('#aOut').onclick=async()=>{await sb.auth.signOut();toast('Signed out')});
-  $('#aSync')&&($('#aSync').onclick=pull);
+  $('#aOut')&&($('#aOut').onclick=async()=>{
+    signingOut=true;
+    const r=sb?await sb.auth.signOut().catch(err=>({error:err})):{error:true};
+    // offline, the server can't be told: end the session on this device anyway
+    if(r?.error){signingOut=false;authStorage.removeItem(AUTH_KEY);onSignedOut(false)}
+    toast('Signed out')});
+  $('#aSync')&&($('#aSync').onclick=()=>{if(!authed){toast(navigator.onLine===false?'You are offline. Your trips are saved on this device.':'Still connecting to your account…');return}pull()});
+  $('#aRemember')?.addEventListener('change',e=>{rememberPick=e.target.checked});
+  $('#aKeep')?.addEventListener('change',e=>{setRemember(e.target.checked);renderAccount();toast(e.target.checked?'You’ll stay signed in on this device':'You’ll be signed out when you close the app')});
   document.querySelector('[data-next]')?.addEventListener('click',e=>openTrip(e.currentTarget.dataset.next));
   $('#aAdopt')&&($('#aAdopt').onclick=()=>{const guest=load(keyFor(null)),own=new Set(S.trips.map(t=>t.id));const add=(guest?.trips||[]).filter(t=>!own.has(t.id)).map(t=>normTrip({...t}));add.forEach(t=>{S.trips.push(t);touch(t)});if(!S.current&&add[0])S.current=add[0].id;save();renderAll();renderAccount();toast(`Added ${add.length} ${add.length===1?'trip':'trips'} to your account`)});
-  $('#aRename')&&($('#aRename').onchange=async e=>{const n=e.target.value.trim();const{error}=await sb.auth.updateUser({data:{name:n}});if(!error){user.name=n;toast('Name saved');renderHub();renderAccount()}});
+  sb&&$('#aRename')&&($('#aRename').onchange=async e=>{const n=e.target.value.trim();const{error}=await sb.auth.updateUser({data:{name:n}});if(!error){user.name=n;toast('Name saved');renderHub();renderAccount()}});
   $('#styleSeg').onclick=e=>{const b=e.target.closest('[data-s]');if(!b)return;S.prefs.mapStyle=b.dataset.s;save();applyStyle();renderAccount()};
   $('#aExport').onclick=()=>exportFile(null,'trip-atlas-backup');
   $('#aImport').onclick=()=>$('#fileIn').click();
@@ -1215,18 +1297,23 @@ function renderAccount(){
 async function submitAuth(e){
   e.preventDefault();
   authName=$('#aName')?.value.trim()||authName;authEmail=$('#aEmail').value.trim();const password=$('#aPass').value;
+  rememberPick=$('#aRemember')?.checked??rememberPick;
+  try{localStorage.setItem(REMEMBER,rememberPick?'1':'0')}catch(err){}   // decides where the new session is stored
   authErr='';authBusy=true;renderAccount();
   let res;
-  if(authMode==='signup') res=await sb.auth.signUp({email:authEmail,password,options:{data:{name:authName}}});
-  else res=await sb.auth.signInWithPassword({email:authEmail,password});
+  try{
+    if(authMode==='signup') res=await sb.auth.signUp({email:authEmail,password,options:{data:{name:authName}}});
+    else res=await sb.auth.signInWithPassword({email:authEmail,password});
+  }catch(err){res={error:err}}
   authBusy=false;
   authOk='';
   if(res.error){
     const m=res.error.message||'';
-    authErr=/invalid login/i.test(m)?'That email and password don’t match. Check the password, or tap “Forgot password?”.':/already registered/i.test(m)?'This email already has an account. Sign in instead.':/not confirmed/i.test(m)?'This email is not confirmed yet. Turn off “Confirm email” in Supabase or open the confirmation email.':m;
+    authErr=/fetch|load failed|network/i.test(m)?'No connection right now. Check your internet and try again.':/invalid login/i.test(m)?'That email and password don’t match. Check the password, or tap “Forgot password?”.':/already registered/i.test(m)?'This email already has an account. Sign in instead.':/not confirmed/i.test(m)?'This email is not confirmed yet. Turn off “Confirm email” in Supabase or open the confirmation email.':m;
     renderAccount();return;
   }
   if(authMode==='signup'&&!res.data.session){authMode='signin';authErr='Account created. Confirm the email we sent, then sign in.';renderAccount();return}
+  try{if(rememberPick)localStorage.setItem('atlas.lastEmail',authEmail);else localStorage.removeItem('atlas.lastEmail')}catch(err){}
   toast(`Signed in as ${authEmail}`);
 }
 
@@ -1236,7 +1323,7 @@ function setTab(t){
   document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
   if(t!=='map')closeDetail();
   if(t==='trips')renderHub();if(t==='account')renderAccount();
-  if(t==='map'){map.resize();renderTripUI()}
+  if(t==='map'){map?.resize();renderTripUI()}
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='map'&&tab==='map'){fitAll();return}setTab(b.dataset.tab)});
 $('#hubAvatar').onclick=()=>setTab('account');
@@ -1244,17 +1331,61 @@ document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('di
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 function renderAll(){renderHub();renderTripUI();if(tab==='account')renderAccount()}
 
-loadState();initMap();renderAll();
-map.once('load',()=>fitAll(false));
+/* ================= Screen fit ================= */
+// iOS home screen apps (iOS 26+) can stop the page short of the screen bottom by about the status bar height,
+// which leaves an empty band under the tab bar. Measure the shortfall; the fixed layers extend by it (--gap).
+const vpProbe=document.createElement('div');
+vpProbe.style.cssText='position:fixed;left:0;top:0;bottom:0;width:0;padding-top:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none';
+document.body.appendChild(vpProbe);
+let vpGap=0;
+function fitViewport(){
+  const standalone=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+  const h=vpProbe.getBoundingClientRect().height,top=parseFloat(getComputedStyle(vpProbe).paddingTop)||0;
+  const full=innerWidth>innerHeight?Math.min(screen.width,screen.height):Math.max(screen.width,screen.height);
+  const d=Math.round(full-h);
+  let g=vpGap;
+  if(!standalone||d<=1)g=0;
+  else if(d<=top+8)g=d;            // anything bigger is the keyboard or a split-screen window: leave it
+  if(g!==vpGap){vpGap=g;document.documentElement.style.setProperty('--gap',g+'px');map?.resize()}
+}
+
+/* ================= Boot ================= */
+// Show the saved account at once, also offline. Supabase confirms it (or ends it) a moment later.
+if(HAS_AUTH){try{const s=JSON.parse(authStorage.getItem(AUTH_KEY)||'null');if(s?.user?.id)user=userFrom(s.user)}catch(e){}}
 if(sb){
   sb.auth.onAuthStateChange((ev,session)=>{
+    // Supabase holds its auth lock while calling this: reach Supabase again only via setTimeout
     if(ev==='PASSWORD_RECOVERY'){recovering=true;setTimeout(()=>setTab('account'),0)}
-    if(session?.user&&(!user||user.id!==session.user.id)) setTimeout(()=>onSignedIn(session.user),0);
-    else if(!session&&user) setTimeout(onSignedOut,0);
-    else if(session?.user&&user){user.name=session.user.user_metadata?.name||user.name;paintAvatars()}
+    if(session?.user){
+      const first=!authed;authed=true;
+      if(!user||user.id!==session.user.id) setTimeout(()=>onSignedIn(session.user),0);
+      else{user.name=session.user.user_metadata?.name||user.name;user.email=session.user.email||user.email;
+        setTimeout(()=>{paintAvatars();if(first)pull();else if(tab==='account')renderAccount()},0)}
+    } else if(ev==='SIGNED_OUT'){
+      authed=false;const expired=!signingOut;signingOut=false;
+      if(user) setTimeout(()=>onSignedOut(expired),0);
+    } else if(ev==='INITIAL_SESSION'&&user){
+      // Not confirmed. If the session is still saved the phone is offline: keep the account, Supabase retries.
+      if(!authStorage.getItem(AUTH_KEY)) setTimeout(()=>onSignedOut(true),0);
+      else if(tab==='account') setTimeout(renderAccount,0);
+    }
   });
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&user)pull()});
+  addEventListener('online',()=>{if(user&&!authed)sb.auth.getSession();if(tab==='account')renderAccount()});
+  addEventListener('offline',()=>{if(tab==='account')renderAccount()});
 }
+loadState();
+try{initMap()}catch(e){console.error(e);setTimeout(()=>toast('The map could not load. Check your connection, then reopen the app.'),800)}
+try{renderAll()}catch(e){console.error(e)}
+document.body.classList.remove('booting');
+fitViewport();
+addEventListener('resize',()=>requestAnimationFrame(fitViewport));
+addEventListener('orientationchange',()=>setTimeout(fitViewport,350));
+addEventListener('pageshow',()=>requestAnimationFrame(fitViewport));
+window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitViewport));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(fitViewport,300)});
+setTimeout(fitViewport,400);setTimeout(fitViewport,1500);
+map?.once('load',()=>fitAll(false));
 </script>
 </body>
 </html>
