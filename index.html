@@ -405,7 +405,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=11"></script>
+<script src="config.js?v=12"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -484,7 +484,7 @@ let user=null;                 // {id,email,name}
 let S=null;                    // {trips,current,prefs}
 let tab='trips', filter='all', selected=null;
 const keyFor=u=>'atlas.v2.'+(u?u.id:'guest');
-let INFO=load('atlas.info.v3')||{};
+let INFO=load('atlas.info.v4')||{};
 
 const roleOf=t=>(!user||!t)?'owner':(S.roles?.[t.id]||'owner');
 const canEdit=t=>roleOf(t)!=='viewer';
@@ -670,26 +670,44 @@ async function wikimediaPhotos(p,art){
   const byName=new Map(info.map(f=>[f.title,f]));
   return ranked.map(f=>byName.get(f)).filter(Boolean).filter(goodPhoto).slice(0,8);
 }
-// Optional: Google Maps photos, when a Google API key is set in config.js.
-let gPlaces=null;
-async function googlePlaces(){
-  if(gPlaces)return gPlaces;
-  gPlaces=new Promise((res,rej)=>{const s=document.createElement('script');
-    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(CFG.googleMapsKey)}&v=weekly&loading=async&callback=__gmReady`;
-    window.__gmReady=async()=>{try{res(await google.maps.importLibrary('places'))}catch(e){rej(e)}};s.onerror=rej;document.head.appendChild(s)});
-  return gPlaces;
+// Free traveller photos from Flickr and others via Openverse (no key needed).
+async function cityOf(p){
+  try{const r=await(await fetch('https://photon.komoot.io/reverse?'+new URLSearchParams({lat:p.lat,lon:p.lon,lang:'en'}))).json();
+    const pr=r.features?.[0]?.properties||{};return pr.city||pr.town||pr.village||pr.county||''}catch(e){return ''}
 }
-async function googlePhotos(p){
-  if(!CFG.googleMapsKey)return [];
-  const {Place}=await googlePlaces();
-  const {places}=await Place.searchByText({textQuery:p.name,fields:['displayName','photos','location'],locationBias:{lat:p.lat,lng:p.lon},maxResultCount:1});
-  const pl=places?.[0];if(!pl?.photos?.length)return [];
-  if(pl.location&&km(p.lat,p.lon,pl.location.lat(),pl.location.lng())>2)return [];
-  return pl.photos.slice(0,8).map(ph=>({src:ph.getURI({maxWidth:1600}),page:ph.authorAttributions?.[0]?.uri||'',by:ph.authorAttributions?.[0]?.displayName||'',lic:'Google Maps',tw:ph.widthPx,th:ph.heightPx,g:1}));
+const OV_BAD=/\b(map|plan|logo|drawing|painting|sketch|poster|lego|minifig|doll|toy|cosplay|costume|disney)\b/i;
+async function openversePhotos(p,city){
+  const query=city&&!similar(p.name,city)&&!norm(p.name).includes(norm(city)[0])?`${p.name} ${city}`:p.name;
+  let j;
+  for(let i=0;i<3;i++){
+    const r=await fetch('https://api.openverse.org/v1/images/?'+new URLSearchParams({q:query,page_size:30,mature:'false'}));
+    if(r.ok){j=await r.json();break}
+    if(i===2||(r.status!==429&&r.status<500))throw new Error('openverse '+r.status);
+    await new Promise(res=>setTimeout(res,1500*(i+1)));
+  }
+  const perCreator=new Map(),out=[];
+  for(const r of j.results||[]){
+    const text=[r.title,...(r.tags||[]).map(t=>t.name)].join(' ');
+    if(!similar(p.name,text))continue;                                 // must actually be about this place
+    if(OV_BAD.test(text)&&!OV_BAD.test(p.name))continue;                // skip toys, maps, costumes… unless that is the place
+    const w=r.width||0,hh=r.height||0;
+    if(Math.max(w,hh)<800||(w&&hh&&(w/hh<0.55||w/hh>2.4)))continue;
+    const c=(r.creator||'').toLowerCase();if((perCreator.get(c)||0)>=2)continue;perCreator.set(c,(perCreator.get(c)||0)+1);
+    out.push({src:r.url,thumb:r.thumbnail,page:r.foreign_landing_url||r.url,by:(r.creator||'').slice(0,60),
+      lic:r.license?`CC ${r.license.toUpperCase()} ${r.license_version||''}`.trim():'',tw:w,th:hh,id:'ov:'+r.id});
+    if(out.length>=8)break;
+  }
+  return out;
 }
 async function findPhotos(p,art){
-  const [g,w]=await Promise.all([googlePhotos(p).catch(()=>[]),wikimediaPhotos(p,art)]);
-  return (g.length?[...g.slice(0,6),...w.slice(0,3)]:w).map(({title,mime,w,h,year,...f})=>({...f,id:title||f.src}));
+  const [city,w]=await Promise.all([cityOf(p),wikimediaPhotos(p,art)]);
+  let ov=[];try{ov=await openversePhotos(p,city)}catch(e){if(!w.length)throw e}
+  const wm=w.map(({title,mime,w,h,year,...f})=>({...f,id:title||f.src}));
+  // Mix: the best traveller shots first, with the official and most-used encyclopedia photos woven in.
+  const out=[],take=(a,n)=>{for(let i=0;i<n&&a.length;i++)out.push(a.shift())};
+  const A=[...ov],B=[...wm];
+  take(A,2);take(B,1);take(A,2);take(B,1);take(A,2);take(B,2);take(A,4);take(B,4);
+  return out.slice(0,10);
 }
 const infoKey=p=>`${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}|${p.wiki||''}|${p.name}`;
 const pending=new Map(),queue=[];let running=0;
@@ -702,7 +720,7 @@ function pump(){
       try{
         const art=await findArticle(p);
         const photos=await findPhotos(p,art);
-        out={photos,extract:art?.extract||'',title:art?.title||''};INFO[k]=out;store('atlas.info.v3',INFO);ok=true;
+        out={photos,extract:art?.extract||'',title:art?.title||''};INFO[k]=out;store('atlas.info.v4',INFO);ok=true;
       }catch(e){}
       pending.delete(k);running--;res(out);pump();if(ok)onInfo(p);
     })();
@@ -710,10 +728,11 @@ function pump(){
 }
 // Smaller Commons thumbnails for lists and cards
 // Commons serves standard widths (330, 500, 960, 1280, 1920…); drop tracking params.
-const sized=(src,w)=>!src?'':/googleapis|googleusercontent/.test(src)?src:src.replace(/\/(\d+)px-([^/?]+)(\?.*)?$/,(m,_,f)=>`/${w}px-${f}`);
+const sized=(src,w)=>!src?'':!/upload\.wikimedia\.org/.test(src)?src:src.replace(/\/(\d+)px-([^/?]+)(\?.*)?$/,(m,_,f)=>`/${w}px-${f}`);
 function photosOf(p){const ph=(INFO[infoKey(p)]?.photos||[]).filter(x=>!(p.hidePhotos||[]).includes(x.id||x.src));
   const c=ph.findIndex(x=>(x.id||x.src)===p.coverPhoto);if(c>0)ph.unshift(...ph.splice(c,1));return ph}
-const photoOf=(p,w=330)=>sized(photosOf(p)[0]?.src||'',w);
+const thumbOf=(ph,w=330)=>!ph?'':(ph.thumb&&w<=500?ph.thumb:sized(ph.src,w));
+const photoOf=(p,w=330)=>thumbOf(photosOf(p)[0],w);
 function coverOf(t){for(const p of t.places){const s=photoOf(p,960);if(s)return s}return ''}
 let hubTimer=null;
 function onInfo(p){
@@ -817,8 +836,8 @@ function renderDetail(p){
   const t=trip(),g=groupOf(t,p),inf=INFO[infoKey(p)],name=encodeURIComponent(p.name);
   const boxR=Math.min(innerWidth,700)/Math.min(300,innerHeight*0.38),phs=inf?photosOf(p):[];
   const photos=inf?(phs.length?phs.map((ph,i)=>{const r=ph.tw&&ph.th?ph.tw/ph.th:boxR;const cover=Math.abs(r-boxR)/boxR<0.3;
-      return `<button class="slide${cover?' cover':''}" data-ph="${i}" aria-label="Open photo ${i+1}"><span class="bg" style="background-image:url('${esc(sized(ph.src,330))}')"></span><img src="${esc(ph.src)}" alt="${esc(p.name)}" ${i?'loading="lazy"':''}></button>`}).join('')
-    :`<div class="ph" style="flex-direction:column;gap:6px;text-align:center;padding:0 24px"><b style="color:var(--ink)">No good photos found</b><span>Add the English Wikipedia title in Edit place, or connect Google Maps photos.</span></div>`):`<div class="ph">Loading photos…</div>`;
+      return `<button class="slide${cover?' cover':''}" data-ph="${i}" aria-label="Open photo ${i+1}"><span class="bg" style="background-image:url('${esc(thumbOf(ph,330))}')"></span><img src="${esc(ph.src)}" alt="${esc(p.name)}" ${i?'loading="lazy"':''}></button>`}).join('')
+    :`<div class="ph" style="flex-direction:column;gap:6px;text-align:center;padding:0 24px"><b style="color:var(--ink)">No good photos found</b><span>Try a more specific name, or add the English Wikipedia title in Edit place.</span></div>`):`<div class="ph">Loading photos…</div>`;
   $('#detailScroll').innerHTML=`
     <div class="hero-photo"><div class="strip" id="strip">${photos}</div>${phs.length?`<span class="zoom-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Tap to view</span>`:''}${phs.length>1?`<span class="count" id="phCount">1 / ${phs.length}</span>`:''}</div>
     <div class="d-body" style="--c:${g.color}">
@@ -832,7 +851,7 @@ function renderDetail(p){
         <a class="btn" href="https://www.google.com/maps/search/?api=1&query=${name}%20${p.lat},${p.lon}" target="_blank" rel="noopener">${ICON.clock}Hours</a>
         ${canEdit(t)?`<button class="btn wide" id="dEdit">${ICON.edit}Edit place</button>`:`<div class="viewonly wide" style="grid-column:1/-1">View only · shared by ${esc(t.ownerName||t.ownerEmail||'the owner')}</div>`}
       </div>
-      <p class="credit">Photos from Wikipedia and Wikimedia Commons, taken near this spot. Tap a photo for its source.</p>
+      <p class="credit">Photos by travellers on Flickr and Wikimedia Commons under open licences, found through Openverse and Wikipedia.</p>
     </div>`;
   $('#dEdit')&&($('#dEdit').onclick=()=>openPlaceForm(p));
   const strip=$('#strip'),cnt=$('#phCount');
@@ -850,7 +869,7 @@ function openViewer(photos,i,place){
 }
 function lbIndex(){const s=$('#lbStrip');return Math.round(s.scrollLeft/Math.max(1,s.clientWidth))}
 function lbInfo(i){const ph=lbPhotos[i]||{};$('#lbCount').textContent=`${i+1} / ${lbPhotos.length}`;
-  $('#lbCredit').textContent=[ph.by&&('Photo: '+ph.by),ph.lic].filter(Boolean).join(' · ')||'Wikimedia Commons';$('#lbSrc').href=ph.page||'#'}
+  $('#lbCredit').textContent=[ph.by&&('Photo: '+ph.by),ph.lic].filter(Boolean).join(' · ')||'Open licence photo';$('#lbSrc').href=ph.page||'#'}
 $('#lbStrip').addEventListener('scroll',()=>lbInfo(lbIndex()),{passive:true});
 $('#lbClose').onclick=()=>{$('#lb').hidden=true;$('#lbStrip').innerHTML=''};
 $('#lbCover').onclick=()=>{const p=lbPlace,ph=lbPhotos[lbIndex()];if(!p||!ph)return;p.coverPhoto=ph.id||ph.src;touch(trip());$('#lbClose').click();renderDetail(p);renderList();renderHub();toast('Cover photo set')};
