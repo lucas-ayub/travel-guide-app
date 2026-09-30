@@ -138,7 +138,11 @@ body[data-tab="trips"] #view-trips,body[data-tab="account"] #view-account{displa
 .brand img{width:36px;height:36px;border-radius:10px}
 .brand b{font:800 20px/1 var(--display);letter-spacing:-.02em}
 .brand .grow{flex:1}
-.avatar{width:38px;height:38px;border-radius:50%;border:0;background:var(--navy);color:var(--bg);font:700 15px var(--display);display:grid;place-items:center}
+.avatar{width:38px;height:38px;border-radius:50%;border:0;background:var(--av,#5F6368);color:#fff;font:600 17px/1 var(--body);display:grid;place-items:center;flex:none;text-transform:uppercase;padding:0}
+.avatar.guest{background:var(--surface-2);color:var(--muted)}
+.avatar.guest svg{width:20px;height:20px}
+.tab-av{width:27px;height:27px;font-size:13px}
+.tabs button[aria-selected="true"] .tab-av{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
 .greet h1{margin:0;font:800 34px/1.05 var(--display);letter-spacing:-.025em;text-wrap:balance}
 .greet p{margin:6px 0 0;color:var(--muted)}
 .hero{position:relative;border:0;padding:0;width:100%;text-align:left;border-radius:26px;overflow:hidden;min-height:250px;background:linear-gradient(150deg,#123B5A,#081726);color:#fff;box-shadow:var(--shadow);display:block}
@@ -168,10 +172,20 @@ body[data-tab="trips"] #view-trips,body[data-tab="account"] #view-account{displa
 .card{background:var(--surface);border-radius:22px;padding:18px;box-shadow:var(--shadow-s);display:flex;flex-direction:column;gap:14px}
 .card h3{margin:0;font:700 19px var(--display)}
 .card p{margin:0;color:var(--muted)}
-.profile{display:flex;gap:14px;align-items:center}
-.profile .avatar{width:56px;height:56px;font-size:21px}
-.profile b{font:700 20px var(--display);display:block}
+.profile{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:10px 0 4px}
+.profile .avatar{width:88px;height:88px;font-size:40px}
+.profile b{font:800 24px/1.1 var(--display);letter-spacing:-.01em;display:block}
 .profile span{color:var(--muted);font-size:14px;word-break:break-all}
+.stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats3 div{background:var(--surface-2);border-radius:16px;padding:12px 8px;text-align:center}
+.stats3 b{display:block;font:800 24px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.stats3 span{font-size:12px;color:var(--muted);font-weight:600}
+.next{display:flex;gap:12px;align-items:center;border:0;background:var(--surface-2);border-radius:16px;padding:10px;text-align:left;width:100%}
+.next .cv{width:52px;height:52px;border-radius:12px;flex:none;background:linear-gradient(150deg,#123B5A,#081726) center/cover no-repeat}
+.empty-hub{background:var(--surface);border-radius:26px;padding:28px 22px;text-align:center;box-shadow:var(--shadow-s);display:flex;flex-direction:column;align-items:center;gap:10px}
+.empty-hub img{width:72px;height:72px;border-radius:20px}
+.empty-hub h2{margin:0;font:800 24px var(--display)}
+.empty-hub p{margin:0;color:var(--muted);max-width:32ch}
 .sync{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted)}
 .sync i{width:9px;height:9px;border-radius:50%;background:var(--muted)}
 .sync.ok i{background:var(--good)}.sync.err i{background:var(--accent)}.sync.busy i{background:#E5A11A}
@@ -285,7 +299,7 @@ textarea{min-height:84px;resize:vertical}
 <nav class="tabs glass" role="tablist">
   <button role="tab" data-tab="trips" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="3"/><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7M3 12h18"/></svg>Trips</button>
   <button role="tab" data-tab="map" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4z"/><path d="M9 4v13.5M15 6.5V20"/></svg>Map</button>
-  <button role="tab" data-tab="account" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.4-3.6 4.3-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg>Account</button>
+  <button role="tab" data-tab="account" aria-selected="false"><span id="tabAv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.4-3.6 4.3-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg></span>Account</button>
 </nav>
 
 <!-- ============ Dialogs ============ -->
@@ -343,7 +357,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=3"></script>
+<script src="config.js?v=4"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -363,6 +377,16 @@ const ICON={
   clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>'
 };
+const AV_COLORS=['#1A73E8','#D93025','#188038','#E37400','#9334E6','#12A4AF','#E52592','#A142F4','#F4511E','#0B8043','#3F51B5','#795548'];
+function avColor(s){let x=0;for(const c of String(s||''))x=(x*31+c.codePointAt(0))>>>0;return AV_COLORS[x%AV_COLORS.length]}
+function initial(u){const n=(u?.name||u?.email||'').trim();return n?[...n][0].toUpperCase():'?'}
+const PERSON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.4-3.6 4.3-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg>';
+function paintAvatars(){
+  const hub=$('#hubAvatar');
+  if(user){hub.className='avatar';hub.style.setProperty('--av',avColor(user.email));hub.textContent=initial(user)}
+  else{hub.className='avatar guest';hub.style.removeProperty('--av');hub.innerHTML=PERSON}
+  $('#tabAv').innerHTML=user?`<span class="avatar tab-av" style="--av:${avColor(user.email)}">${esc(initial(user))}</span>`:PERSON;
+}
 let tt;function toast(m){const el=$('#toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3200)}
 
 /* ================= Seed trip ================= */
@@ -586,7 +610,7 @@ function tripCard(t){
 function renderHub(){
   const h=new Date().getHours();const first=(user?.name||'').split(' ')[0];
   $('#greet').textContent=`Good ${h<12?'morning':h<18?'afternoon':'evening'}${first?', '+first:''}`;
-  $('#hubAvatar').textContent=(user?.name||user?.email||'?').trim()[0]?.toUpperCase()||'?';
+  paintAvatars();
   const all=sortedTrips(); const past=all.filter(t=>status(t)?.kind==='past'); const act=all.filter(t=>status(t)?.kind!=='past');
   const heroT=act[0]||past[0];
   $('#greetSub').textContent=heroT?(status(heroT)?.kind==='now'?`You're on ${heroT.name} right now.`:'Here is what’s coming up.'):'Plan your first trip to get started.';
@@ -599,13 +623,15 @@ function renderHub(){
         <div class="stats"><span><b>${heroT.places.length}</b>places</span><span><b>${heroT.groups.length}</b>groups</span>${n?`<span><b>${n}</b>${n===1?'day':'days'}</span>`:''}</div>
       </div></button>`;
     heroT.places.slice(0,4).forEach(ensureInfo);
-  } else $('#heroSlot').innerHTML='';
-  $('#tripCards').innerHTML=act.filter(t=>t!==heroT).map(tripCard).join('')||(heroT&&status(heroT)?.kind!=='past'?'':'<p class="hint">No upcoming trips.</p>');
+  } else $('#heroSlot').innerHTML=`<div class="empty-hub"><img src="logo.svg" alt=""><h2>${user?'Your atlas is empty':'No trips yet'}</h2><p>Plan a trip, add the places you want to see, and they will show up here and on the map.</p><button class="btn primary" data-new>Plan your first trip</button></div>`;
+  $('#upSec').hidden=!all.length;
+  $('#tripCards').innerHTML=act.filter(t=>t!==heroT).map(tripCard).join('');
   $('#pastSec').hidden=!past.filter(t=>t!==heroT).length;
   $('#pastCards').innerHTML=past.filter(t=>t!==heroT).map(tripCard).join('');
   all.forEach(t=>t.places.slice(0,2).forEach(ensureInfo));
 }
 $('#view-trips').addEventListener('click',e=>{
+  if(e.target.closest('[data-new]')){openTripForm(null);return}
   const ed=e.target.closest('[data-edit]'); if(ed){e.stopPropagation();openTripForm(S.trips.find(t=>t.id===ed.dataset.edit));return}
   const op=e.target.closest('[data-open]'); if(op){openTrip(op.dataset.open)}
 });
@@ -823,12 +849,8 @@ async function pull(){
   save();setSync('ok');renderAll();
 }
 async function onSignedIn(sessionUser){
-  const u={id:sessionUser.id,email:sessionUser.email,name:sessionUser.user_metadata?.name||''};
-  const first=!load(keyFor(u));
-  const guest=load(keyFor(null));
-  user=u;loadState();
-  if(first&&guest?.trips?.length&&!S.trips.length){S.trips=guest.trips.map(normTrip);S.current=guest.current;save()}
-  renderAll();await pull();
+  user={id:sessionUser.id,email:sessionUser.email,name:sessionUser.user_metadata?.name||'',since:sessionUser.created_at||''};
+  loadState();filter='all';closeDetail();renderAll();await pull();
 }
 function onSignedOut(){user=null;loadState();renderAll()}
 
@@ -856,10 +878,21 @@ function renderAccount(){
       </form></div>
       <div class="card"><p>Without an account, your trips stay on this device. When you sign in, they move into your account and sync everywhere.</p></div>`;
   } else {
-    html+=`<div class="card"><div class="profile"><span class="avatar">${esc(initials)}</span><div style="min-width:0"><b>${esc(user.name||'Traveller')}</b><span>${esc(user.email)}</span></div></div>
+    const places=S.trips.reduce((n,t)=>n+t.places.length,0);
+    const upcoming=S.trips.filter(t=>['up','now'].includes(status(t)?.kind));
+    const next=sortedTrips().find(t=>['up','now'].includes(status(t)?.kind));
+    const since=user.since?new Date(user.since).toLocaleDateString('en-GB',{month:'long',year:'numeric'}):'';
+    const guest=load(keyFor(null)); const own=new Set(S.trips.map(t=>t.id));
+    const fromDevice=(guest?.trips||[]).filter(t=>!own.has(t.id));
+    html+=`<div class="card">
+      <div class="profile"><span class="avatar" style="--av:${avColor(user.email)}">${esc(initial(user))}</span>
+        <div><b>${esc(user.name||'Traveller')}</b><span>${esc(user.email)}</span>${since?`<span style="display:block">Member since ${esc(since)}</span>`:''}</div></div>
+      <div class="stats3"><div><b>${S.trips.length}</b><span>${S.trips.length===1?'trip':'trips'}</span></div><div><b>${places}</b><span>places</span></div><div><b>${upcoming.length}</b><span>upcoming</span></div></div>
+      ${next?`<button class="next" data-next="${next.id}"><div class="cv" style="${coverOf(next)?`background-image:url('${esc(coverOf(next))}')`:''}"></div><div class="meta"><b>${esc(next.name)}</b><span class="sub">${esc(fmtRange(next))} · ${status(next).label}</span></div></button>`:''}
       ${syncLine()}
-      <label class="f">Display name<input type="text" id="aRename" value="${esc(user.name)}" placeholder="Your name"></label>
-      <div class="grid-btns"><button class="btn" id="aSync">Sync now</button><button class="btn danger" id="aOut">Sign out</button></div></div>`;
+      <div class="grid-btns"><button class="btn" id="aSync">Sync now</button><button class="btn danger" id="aOut">Sign out</button></div></div>
+    ${fromDevice.length?`<div class="card"><h3>Trips on this device</h3><p>${fromDevice.length} ${fromDevice.length===1?'trip was':'trips were'} saved on this phone before you signed in: ${esc(fromDevice.map(t=>t.name).join(', '))}. They stay separate unless you add them.</p><button class="btn primary" id="aAdopt">Add to my account</button></div>`:''}
+    <div class="card"><h3>Profile</h3><label class="f">Display name<input type="text" id="aRename" value="${esc(user.name)}" placeholder="Your name"></label></div>`;
   }
   const ms=S.prefs.mapStyle||'auto';
   html+=`<div class="card"><h3>Map style</h3><div class="seg" id="styleSeg">${[['auto','Auto'],['liberty','Liberty'],['bright','Bright'],['positron','Light'],['dark','Dark']].map(([k,l])=>`<button data-s="${k}" aria-pressed="${ms===k}">${l}</button>`).join('')}</div><p class="hint">Auto follows your phone's light or dark mode.</p></div>
@@ -870,7 +903,9 @@ function renderAccount(){
   $('#aSwitch')&&($('#aSwitch').onclick=()=>{authMode=authMode==='signup'?'signin':'signup';authErr='';renderAccount()});
   $('#aOut')&&($('#aOut').onclick=async()=>{await sb.auth.signOut();toast('Signed out')});
   $('#aSync')&&($('#aSync').onclick=pull);
-  $('#aRename')&&($('#aRename').onchange=async e=>{const n=e.target.value.trim();const{error}=await sb.auth.updateUser({data:{name:n}});if(!error){user.name=n;toast('Name saved');renderHub()}});
+  document.querySelector('[data-next]')?.addEventListener('click',e=>openTrip(e.currentTarget.dataset.next));
+  $('#aAdopt')&&($('#aAdopt').onclick=()=>{const guest=load(keyFor(null)),own=new Set(S.trips.map(t=>t.id));const add=(guest?.trips||[]).filter(t=>!own.has(t.id)).map(t=>normTrip({...t}));add.forEach(t=>{S.trips.push(t);touch(t)});if(!S.current&&add[0])S.current=add[0].id;save();renderAll();renderAccount();toast(`Added ${add.length} ${add.length===1?'trip':'trips'} to your account`)});
+  $('#aRename')&&($('#aRename').onchange=async e=>{const n=e.target.value.trim();const{error}=await sb.auth.updateUser({data:{name:n}});if(!error){user.name=n;toast('Name saved');renderHub();renderAccount()}});
   $('#styleSeg').onclick=e=>{const b=e.target.closest('[data-s]');if(!b)return;S.prefs.mapStyle=b.dataset.s;save();applyStyle();renderAccount()};
   $('#aExport').onclick=()=>exportFile(null,'trip-atlas-backup');
   $('#aImport').onclick=()=>$('#fileIn').click();
@@ -912,7 +947,7 @@ if(sb){
   sb.auth.onAuthStateChange((ev,session)=>{
     if(session?.user&&(!user||user.id!==session.user.id)) setTimeout(()=>onSignedIn(session.user),0);
     else if(!session&&user) setTimeout(onSignedOut,0);
-    else if(session?.user&&user) user.name=session.user.user_metadata?.name||user.name;
+    else if(session?.user&&user){user.name=session.user.user_metadata?.name||user.name;paintAvatars()}
   });
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&user)pull()});
 }
