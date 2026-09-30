@@ -406,7 +406,7 @@ textarea{min-height:84px;resize:vertical}
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=15"></script>
+<script src="config.js?v=16"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -678,14 +678,14 @@ async function categoryPhotos(cat){
   return files.filter(goodPhoto).sort((a,b)=>b.w*b.h-a.w*a.h);
 }
 async function spotPhotos(p,names,strict){
-  const near=await commonsFiles({generator:'geosearch',ggscoord:`${p.lat}|${p.lon}`,ggsradius:strict?250:150,ggsnamespace:6,ggslimit:40});
+  const near=await commonsFiles({generator:'geosearch',ggscoord:`${p.lat}|${p.lon}`,ggsradius:strict?250:120,ggsnamespace:6,ggslimit:40});
   const m=f=>Math.max(...names.map(n=>similar(n,f.title)));
   const ok=near.filter(goodPhoto).filter(f=>strict?m(f)>0:true);
   return ok.sort((a,b)=>m(b)-m(a)).map(f=>strict?f:{...f,nearby:true});
 }
 async function cityOf(p){
   try{const r=await(await fetch('https://photon.komoot.io/reverse?'+new URLSearchParams({lat:p.lat,lon:p.lon,lang:'en'}))).json();
-    const pr=r.features?.[0]?.properties||{};return pr.city||pr.town||pr.village||pr.county||''}catch(e){return ''}
+    const pr=r.features?.[0]?.properties||{};return{city:pr.city||pr.town||pr.village||pr.county||'',street:pr.street||pr.name||''}}catch(e){return{city:'',street:''}}
 }
 const OV_BAD=/\b(map|plan|logo|drawing|painting|sketch|poster|lego|minifig|doll|toy|cosplay|costume|disney)\b/i;
 let ovGate=Promise.resolve();
@@ -732,13 +732,13 @@ function colourful(src){
 async function findPhotos(p,art){
   const good=[],seen=new Set();let partial=false;
   const tidy=({title,mime,w,h,year,...f})=>({...f,id:f.id||title||f.src});
-  async function accept(list,tier){
+  async function accept(list,tier,cap=PHOTO_MAX){
     const fresh=[];for(const ph of list.map(tidy)){if(seen.has(ph.id))continue;seen.add(ph.id);fresh.push(ph);if(fresh.length>=PHOTO_MAX)break}
     const scores=await Promise.all(fresh.map(ph=>colourful(thumbOf(ph,330))));
-    fresh.forEach((ph,i)=>{if(scores[i]>=14&&good.length<PHOTO_MAX)good.push({...ph,tier})});
+    let n=0;fresh.forEach((ph,i)=>{if(scores[i]>=14&&good.length<PHOTO_MAX&&n<cap){good.push({...ph,tier});n++}});
   }
   const need=()=>good.length<PHOTO_TARGET;
-  const [city,bits]=await Promise.all([cityOf(p),art?wikiBits(art):null]);
+  const [{city,street},bits]=await Promise.all([cityOf(p),art?wikiBits(art):null]);
   const names=[p.name,...(bits?.names||[])];
   // Tiers 1 + 2, woven together: the best traveller shots first, encyclopedia photos in between.
   const [ov,enc]=await Promise.all([
@@ -757,7 +757,8 @@ async function findPhotos(p,art){
   // Tier 5: photos at the spot that name the place
   if(need()) await accept(await spotPhotos(p,names,true).catch(()=>[]),5);
   // Tier 6: the surroundings, clearly marked
-  if(good.length<3) await accept(await spotPhotos(p,names,false).catch(()=>[]),6);
+  // Tier 6: the surroundings, clearly marked; photos of the same street first, at most three
+  if(good.length<3) await accept(await spotPhotos(p,street?[street,...names]:names,false).catch(()=>[]),6,3-good.length);
   if(!good.length&&partial)throw new Error('sources unavailable');
   good.partial=partial;return good;
 }
