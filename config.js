@@ -4,5 +4,8 @@
 // Leave them empty to use the app without accounts (trips stay on this device only).
 window.ATLAS_CONFIG = {
   supabaseUrl: "https://aavedftluvbiezkdkmhm.supabase.co",
-  supabaseAnonKey: "sb_publishable_bVy0Is_Q63rlf9IBusJeYA_QtIX9mER"
+  supabaseAnonKey: "sb_publishable_bVy0Is_Q63rlf9IBusJeYA_QtIX9mER",
+  // Optional: a Google Maps Platform key (Places API New + Maps JavaScript API), restricted to your site.
+  // When set, place photos come from Google Maps first.
+  googleMapsKey: ""
 };

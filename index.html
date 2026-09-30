@@ -129,6 +129,9 @@ body.sheet-open .sheet{height:50vh}
 .lb-bar{padding:10px 16px calc(var(--sb) + 14px);font-size:12.5px;color:rgba(255,255,255,.75);display:flex;gap:10px;justify-content:space-between;align-items:center}
 .lb-bar span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lb-bar a{color:#fff;font-weight:700;text-decoration:none;flex:none}
+.lb-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 14px calc(var(--sb) + 14px)}
+.lb-actions button{border:0;border-radius:14px;min-height:46px;background:rgba(255,255,255,.14);color:#fff;font-weight:600}
+.lb-bar{padding-bottom:10px}
 .hero-photo .ph{flex:none;width:100%;display:grid;place-items:center;color:var(--muted)}
 .hero-photo .count{position:absolute;right:14px;bottom:14px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;font-variant-numeric:tabular-nums}
 .close{position:absolute;right:14px;top:14px;z-index:3;width:38px;height:38px;border-radius:50%;border:0;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -397,11 +400,12 @@ textarea{min-height:84px;resize:vertical}
   <div class="lb-top"><span id="lbCount"></span><button id="lbClose" aria-label="Close photos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="lb-strip" id="lbStrip"></div>
   <div class="lb-bar"><span id="lbCredit"></span><a id="lbSrc" target="_blank" rel="noopener">Source ↗</a></div>
+  <div class="lb-actions" id="lbActions"><button id="lbCover">Use as cover</button><button id="lbHide">Hide this photo</button></div>
 </div>
 <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=7"></script>
+<script src="config.js?v=8"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -480,7 +484,7 @@ let user=null;                 // {id,email,name}
 let S=null;                    // {trips,current,prefs}
 let tab='trips', filter='all', selected=null;
 const keyFor=u=>'atlas.v2.'+(u?u.id:'guest');
-let INFO=load('atlas.info.v2')||{};
+let INFO=load('atlas.info.v3')||{};
 
 const roleOf=t=>(!user||!t)?'owner':(S.roles?.[t.id]||'owner');
 const canEdit=t=>roleOf(t)!=='viewer';
@@ -613,37 +617,69 @@ async function wikidata(qid){
   return{images:(c.P18||[]).map(v).filter(Boolean),cat:v(c.P373?.[0])||''};
 }
 // Files that are maps, plans, logos, drawings etc. are not photos of the place.
-const NOT_PHOTO=/\b(map|maps|plan|plans|logo|coat of arms|arms|diagram|drawing|sketch|stamp|coin|banknote|poster|plaque|seal|flag|icon|floor|blueprint|engraving|lithograph|etching|postcard|document|scan|text|screenshot|chart|model)\b/i;
+const NOT_PHOTO=/\b(map|maps|kort|karte|plan|plans|grundriss|logo|coat of arms|arms|wappen|v[aå]benskjold|vapen|diagram|drawing|sketch|stamp|coin|banknote|poster|plaque|seal|flag|icon|floor|blueprint|engraving|lithograph|etching|painting|postcard|document|scan|text|screenshot|chart|model|texture|detail|sign|signage|manhole)\b/i;
 const stripHtml=s=>String(s||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
 async function commonsFiles(params){
-  const j=await q(CM,{action:'query',prop:'imageinfo',iiprop:'url|mime|size|extmetadata',iiextmetadatafilter:'Artist|LicenseShortName',iiurlwidth:1280,...params});
-  return Object.values(j?.query?.pages||{}).sort((a,b)=>(a.index||0)-(b.index||0)).map(pg=>{const ii=pg.imageinfo?.[0];if(!ii)return null;
-    return{title:pg.title||'',mime:ii.mime||'',w:ii.width||0,h:ii.height||0,tw:ii.thumbwidth||ii.width,th:ii.thumbheight||ii.height,src:ii.thumburl||ii.url,page:ii.descriptionurl,by:stripHtml(ii.extmetadata?.Artist?.value).slice(0,80),lic:stripHtml(ii.extmetadata?.LicenseShortName?.value)}}).filter(Boolean);
+  const j=await q(CM,{action:'query',prop:'imageinfo',iiprop:'url|mime|size|extmetadata',iiextmetadatafilter:'Artist|LicenseShortName|DateTimeOriginal',iiurlwidth:1280,...params});
+  const pages=Object.values(j?.query?.pages||{});
+  return pages.map(pg=>{const ii=pg.imageinfo?.[0];if(!ii)return null;const md=ii.extmetadata||{};
+    const yr=+(String(stripHtml(md.DateTimeOriginal?.value)).match(/\b(1[5-9]\d\d|20\d\d)\b/)?.[1]||0);
+    return{title:(pg.title||'').replace(/^File:/,''),mime:ii.mime||'',w:ii.width||0,h:ii.height||0,tw:ii.thumbwidth||ii.width,th:ii.thumbheight||ii.height,year:yr,
+      src:ii.thumburl||ii.url,page:ii.descriptionurl,by:stripHtml(md.Artist?.value).slice(0,80),lic:stripHtml(md.LicenseShortName?.value)}}).filter(Boolean);
 }
-const isPhoto=f=>/jpeg|webp/.test(f.mime)&&!NOT_PHOTO.test(f.title.replace(/^File:/,'').replace(/[_\-.]/g,' '));
-const goodSize=f=>f.w>=1200&&f.h>=700&&f.w/f.h>=0.55&&f.w/f.h<=2.4;
+const isPhoto=f=>/jpeg|webp/.test(f.mime)&&!NOT_PHOTO.test(f.title.replace(/[_\-.,()]/g,' '));
+const goodPhoto=f=>isPhoto(f)&&f.w>=800&&f.h>=500&&f.w/f.h>=0.55&&f.w/f.h<=2.4&&!(f.year&&f.year<1960);
+const LANGS=['de','fr','es','it','nl','sv','da','nb','pt','pl','ja','ru','fi','ca','cs','zh','uk','hu','ko','tr'];
+// Rank the images of a Wikipedia article by how many language editions use them:
+// the photo most editors picked for the article is the iconic view of the place.
+async function consensusFiles(enTitle){
+  const j=await q(WP,{action:'query',titles:enTitle,redirects:1,prop:'langlinks|images',lllimit:'max',imlimit:'max'});
+  const pg=Object.values(j?.query?.pages||{})[0]||{};
+  const links=(pg.langlinks||[]).filter(l=>LANGS.includes(l.lang)).slice(0,14);
+  const counts=new Map();const bump=t=>{const f=t.replace(/^[^:]+:/,'').replace(/_/g,' ');if(/\.(jpe?g|webp)$/i.test(f))counts.set(f,(counts.get(f)||0)+1)};
+  (pg.images||[]).forEach(i=>bump(i.title));
+  await Promise.all(links.map(async l=>{try{const r=await q(`https://${l.lang}.wikipedia.org/w/api.php`,{action:'query',titles:l['*'],redirects:1,prop:'images',imlimit:'max'});(Object.values(r?.query?.pages||{})[0]?.images||[]).forEach(i=>bump(i.title))}catch(e){}}));
+  return [...counts].sort((a,b)=>b[1]-a[1]).map(([f,c])=>({f,c}));
+}
+async function wikidata(qid){
+  const j=await q('https://www.wikidata.org/w/api.php',{action:'wbgetentities',ids:qid,props:'claims'});
+  const c=j?.entities?.[qid]?.claims||{};const v=x=>x?.mainsnak?.datavalue?.value;
+  return{images:(c.P18||[]).map(v).filter(Boolean)};
+}
+async function wikimediaPhotos(p,art){
+  if(!art){
+    // No article: only nearby photos whose file name names the place. Better none than random ones.
+    const near=await commonsFiles({generator:'geosearch',ggscoord:`${p.lat}|${p.lon}`,ggsradius:200,ggsnamespace:6,ggslimit:40}).catch(()=>[]);
+    return near.filter(goodPhoto).filter(f=>similar(p.name,f.title)>0).sort((a,b)=>similar(p.name,b.title)-similar(p.name,a.title)).slice(0,6);
+  }
+  const [cons,wd]=await Promise.all([consensusFiles(art.title).catch(()=>[]),art.qid?wikidata(art.qid).catch(()=>null):null]);
+  const lead=(wd?.images||[]).map(f=>f.replace(/_/g,' '));
+  const ranked=[...lead,...cons.filter(x=>x.c>=2||cons.length<6).map(x=>x.f)].filter((f,i,a)=>a.indexOf(f)===i).slice(0,18);
+  if(!ranked.length)return [];
+  const info=await commonsFiles({titles:ranked.map(f=>'File:'+f).join('|')}).catch(()=>[]);
+  const byName=new Map(info.map(f=>[f.title,f]));
+  return ranked.map(f=>byName.get(f)).filter(Boolean).filter(goodPhoto).slice(0,8);
+}
+// Optional: Google Maps photos, when a Google API key is set in config.js.
+let gPlaces=null;
+async function googlePlaces(){
+  if(gPlaces)return gPlaces;
+  gPlaces=new Promise((res,rej)=>{const s=document.createElement('script');
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(CFG.googleMapsKey)}&v=weekly&loading=async&callback=__gmReady`;
+    window.__gmReady=async()=>{try{res(await google.maps.importLibrary('places'))}catch(e){rej(e)}};s.onerror=rej;document.head.appendChild(s)});
+  return gPlaces;
+}
+async function googlePhotos(p){
+  if(!CFG.googleMapsKey)return [];
+  const {Place}=await googlePlaces();
+  const {places}=await Place.searchByText({textQuery:p.name,fields:['displayName','photos','location'],locationBias:{lat:p.lat,lng:p.lon},maxResultCount:1});
+  const pl=places?.[0];if(!pl?.photos?.length)return [];
+  if(pl.location&&km(p.lat,p.lon,pl.location.lat(),pl.location.lng())>2)return [];
+  return pl.photos.slice(0,8).map(ph=>({src:ph.getURI({maxWidth:1600}),page:ph.authorAttributions?.[0]?.uri||'',by:ph.authorAttributions?.[0]?.displayName||'',lic:'Google Maps',tw:ph.widthPx,th:ph.heightPx,g:1}));
+}
 async function findPhotos(p,art){
-  const out=[],seen=new Set();
-  const add=(list,max=10)=>{for(const f of list){const key=f.title||f.src;if(seen.has(key))continue;seen.add(key);out.push(f);if(out.length>=max)break}};
-  const wd=art?.qid?await wikidata(art.qid).catch(()=>null):null;
-  if(wd?.images?.length) add((await commonsFiles({titles:wd.images.slice(0,3).map(f=>'File:'+f).join('|')}).catch(()=>[])).filter(f=>/jpeg|webp|png/.test(f.mime)));
-  if(wd?.cat){
-    const cat=wd.cat.replace(/"/g,'');
-    const [best,all]=await Promise.all([
-      commonsFiles({generator:'search',gsrnamespace:6,gsrlimit:20,gsrsearch:`incategory:"${cat}" incategory:"Quality_images|Featured_pictures_on_Wikimedia_Commons|Valued_images_sorted_by_promotion_date"`}).catch(()=>[]),
-      commonsFiles({generator:'categorymembers',gcmtitle:'Category:'+cat,gcmtype:'file',gcmlimit:50}).catch(()=>[])]);
-    add(best.filter(isPhoto).filter(goodSize));
-    add(all.filter(isPhoto).filter(goodSize).sort((a,b)=>b.w*b.h-a.w*a.h));
-  }
-  if(!out.length&&art?.image) add([{title:art.image,src:art.image,page:`https://en.wikipedia.org/wiki/${encodeURIComponent(art.title)}`,tw:0,th:0,by:'',lic:''}]);
-  if(out.length<4){
-    let near=await commonsFiles({generator:'geosearch',ggscoord:`${p.lat}|${p.lon}`,ggsradius:150,ggsnamespace:6,ggslimit:30}).catch(()=>[]);
-    near=near.filter(isPhoto).filter(f=>f.w>=1000);
-    // photos whose file name mentions the place first
-    near.sort((a,b)=>similar(p.name,b.title)-similar(p.name,a.title));
-    add(near,out.length+6);
-  }
-  return out.map(({title,mime,w,h,...f})=>f);
+  const [g,w]=await Promise.all([googlePhotos(p).catch(()=>[]),wikimediaPhotos(p,art).catch(()=>[])]);
+  return (g.length?[...g.slice(0,6),...w.slice(0,3)]:w).map(({title,mime,w,h,year,...f})=>({...f,id:title||f.src}));
 }
 const infoKey=p=>`${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}|${p.wiki||''}|${p.name}`;
 const pending=new Map(),queue=[];let running=0;
@@ -656,7 +692,7 @@ function pump(){
       try{
         const art=await findArticle(p).catch(()=>null);
         const photos=await findPhotos(p,art);
-        out={photos,extract:art?.extract||'',title:art?.title||''};INFO[k]=out;store('atlas.info.v2',INFO);ok=true;
+        out={photos,extract:art?.extract||'',title:art?.title||''};INFO[k]=out;store('atlas.info.v3',INFO);ok=true;
       }catch(e){}
       pending.delete(k);running--;res(out);pump();if(ok)onInfo(p);
     })();
@@ -664,8 +700,10 @@ function pump(){
 }
 // Smaller Commons thumbnails for lists and cards
 // Commons serves standard widths (330, 500, 960, 1280, 1920…); drop tracking params.
-const sized=(src,w)=>src?src.replace(/\/(\d+)px-([^/?]+)(\?.*)?$/,(m,_,f)=>`/${w}px-${f}`):'';
-const photoOf=(p,w=330)=>sized(INFO[infoKey(p)]?.photos?.[0]?.src||'',w);
+const sized=(src,w)=>!src?'':/googleapis|googleusercontent/.test(src)?src:src.replace(/\/(\d+)px-([^/?]+)(\?.*)?$/,(m,_,f)=>`/${w}px-${f}`);
+function photosOf(p){const ph=(INFO[infoKey(p)]?.photos||[]).filter(x=>!(p.hidePhotos||[]).includes(x.id||x.src));
+  const c=ph.findIndex(x=>(x.id||x.src)===p.coverPhoto);if(c>0)ph.unshift(...ph.splice(c,1));return ph}
+const photoOf=(p,w=330)=>sized(photosOf(p)[0]?.src||'',w);
 function coverOf(t){for(const p of t.places){const s=photoOf(p,960);if(s)return s}return ''}
 let hubTimer=null;
 function onInfo(p){
@@ -767,12 +805,12 @@ function openDetail(id){
 function closeDetail(){$('#detail').classList.remove('show');$('#detail').setAttribute('aria-hidden','true');if(selected){selected=null;renderMarkers()}}
 function renderDetail(p){
   const t=trip(),g=groupOf(t,p),inf=INFO[infoKey(p)],name=encodeURIComponent(p.name);
-  const boxR=Math.min(innerWidth,700)/Math.min(300,innerHeight*0.38);
-  const photos=inf?(inf.photos.length?inf.photos.map((ph,i)=>{const r=ph.tw&&ph.th?ph.tw/ph.th:boxR;const cover=Math.abs(r-boxR)/boxR<0.3;
+  const boxR=Math.min(innerWidth,700)/Math.min(300,innerHeight*0.38),phs=inf?photosOf(p):[];
+  const photos=inf?(phs.length?phs.map((ph,i)=>{const r=ph.tw&&ph.th?ph.tw/ph.th:boxR;const cover=Math.abs(r-boxR)/boxR<0.3;
       return `<button class="slide${cover?' cover':''}" data-ph="${i}" aria-label="Open photo ${i+1}"><span class="bg" style="background-image:url('${esc(sized(ph.src,330))}')"></span><img src="${esc(ph.src)}" alt="${esc(p.name)}" ${i?'loading="lazy"':''}></button>`}).join('')
-    :`<div class="ph">No photos found for this place</div>`):`<div class="ph">Loading photos…</div>`;
+    :`<div class="ph" style="flex-direction:column;gap:6px;text-align:center;padding:0 24px"><b style="color:var(--ink)">No good photos found</b><span>Add the English Wikipedia title in Edit place, or connect Google Maps photos.</span></div>`):`<div class="ph">Loading photos…</div>`;
   $('#detailScroll').innerHTML=`
-    <div class="hero-photo"><div class="strip" id="strip">${photos}</div>${inf?.photos?.length?`<span class="zoom-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Tap to view</span>`:''}${inf?.photos?.length>1?`<span class="count" id="phCount">1 / ${inf.photos.length}</span>`:''}</div>
+    <div class="hero-photo"><div class="strip" id="strip">${photos}</div>${phs.length?`<span class="zoom-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Tap to view</span>`:''}${phs.length>1?`<span class="count" id="phCount">1 / ${phs.length}</span>`:''}</div>
     <div class="d-body" style="--c:${g.color}">
       <h2>${esc(p.name)}</h2>
       <div class="d-tags"><span class="tag" style="--c:${g.color}"><i></i>${esc(g.name)} · #${orderIndex(t,p)}</span>${me?`<span>${dist(p)} away</span>`:''}</div>
@@ -788,14 +826,15 @@ function renderDetail(p){
     </div>`;
   $('#dEdit')&&($('#dEdit').onclick=()=>openPlaceForm(p));
   const strip=$('#strip'),cnt=$('#phCount');
-  if(strip&&cnt) strip.addEventListener('scroll',()=>{cnt.textContent=`${Math.round(strip.scrollLeft/strip.clientWidth)+1} / ${inf.photos.length}`},{passive:true});
-  strip?.querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>openViewer(inf.photos,+b.dataset.ph,p.name));
+  if(strip&&cnt) strip.addEventListener('scroll',()=>{cnt.textContent=`${Math.round(strip.scrollLeft/strip.clientWidth)+1} / ${phs.length}`},{passive:true});
+  strip?.querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>openViewer(phs,+b.dataset.ph,p));
 }
 $('#detailClose').onclick=closeDetail;
-let lbPhotos=[];
-function openViewer(photos,i,name){
-  lbPhotos=photos;const s=$('#lbStrip');
-  s.innerHTML=photos.map(ph=>`<div class="lb-slide"><img src="${esc(ph.src)}" alt="${esc(name)}" draggable="false"></div>`).join('');
+let lbPhotos=[],lbPlace=null;
+function openViewer(photos,i,place){
+  lbPhotos=photos;lbPlace=place;const s=$('#lbStrip');
+  $('#lbActions').hidden=!canEdit(trip());
+  s.innerHTML=photos.map(ph=>`<div class="lb-slide"><img src="${esc(ph.src)}" alt="${esc(place.name)}" draggable="false"></div>`).join('');
   $('#lb').hidden=false;s.classList.remove('locked');
   requestAnimationFrame(()=>{s.scrollLeft=i*s.clientWidth;lbInfo(i)});
 }
@@ -804,6 +843,10 @@ function lbInfo(i){const ph=lbPhotos[i]||{};$('#lbCount').textContent=`${i+1} / 
   $('#lbCredit').textContent=[ph.by&&('Photo: '+ph.by),ph.lic].filter(Boolean).join(' · ')||'Wikimedia Commons';$('#lbSrc').href=ph.page||'#'}
 $('#lbStrip').addEventListener('scroll',()=>lbInfo(lbIndex()),{passive:true});
 $('#lbClose').onclick=()=>{$('#lb').hidden=true;$('#lbStrip').innerHTML=''};
+$('#lbCover').onclick=()=>{const p=lbPlace,ph=lbPhotos[lbIndex()];if(!p||!ph)return;p.coverPhoto=ph.id||ph.src;touch(trip());$('#lbClose').click();renderDetail(p);renderList();renderHub();toast('Cover photo set')};
+$('#lbHide').onclick=()=>{const p=lbPlace,ph=lbPhotos[lbIndex()];if(!p||!ph)return;p.hidePhotos=[...(p.hidePhotos||[]),ph.id||ph.src];touch(trip());
+  const i=lbIndex();lbPhotos=photosOf(p);if(!lbPhotos.length){$('#lbClose').click();renderDetail(p);toast('Photo hidden');return}
+  openViewer(lbPhotos,Math.min(i,lbPhotos.length-1),p);renderDetail(p);renderList();toast('Photo hidden')};
 // double tap (or double click) to zoom in and out
 let lastTap=0;
 function toggleZoom(slide,x,y){
