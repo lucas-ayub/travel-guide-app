@@ -7,217 +7,313 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trip Atlas">
-<meta name="theme-color" content="#16232B">
+<meta name="theme-color" content="#0A1320">
 <link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Trip Atlas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
-/* Layout: full-screen map; trip bar on top, list in a bottom sheet, place card sliding up over it */
+/* Layout: three tabs over one living map. Trips (hub) and Account are opaque panels; the Map tab reveals the map with glass bars, a list sheet and a place card. */
 :root{
-  --bg:#EEF2F2; --surface:#FFFFFF; --ink:#16232B; --muted:#5A6A71; --line:#D8E0E2;
-  --accent:#C8372D; --accent-ink:#FFFFFF; --chip:#E3E9EA; --shadow:0 10px 30px rgba(22,35,43,.18);
+  --bg:#F2F4F7; --surface:#FFFFFF; --surface-2:#EBEFF3; --ink:#0C1B2A; --muted:#5A6B7C; --line:#DCE3EA;
+  --accent:#F0452B; --accent-2:#FF8A5B; --navy:#123B5A; --on-accent:#FFFFFF; --good:#138A5E;
+  --glass:rgba(255,255,255,.82); --scrim:rgba(8,20,32,.5); --shadow:0 12px 32px rgba(12,27,42,.14); --shadow-s:0 2px 10px rgba(12,27,42,.10);
   --display:"Bricolage Grotesque", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
   --body:"Figtree", -apple-system, "SF Pro Text", system-ui, sans-serif;
   --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
+  --tabh:calc(62px + var(--sb));
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
-  :root{ --bg:#0E1518; --surface:#172226; --ink:#E6EDEF; --muted:#94A4AA; --line:#2A393E;
-    --accent:#EE624D; --accent-ink:#1A0B08; --chip:#223035; --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark; }
+  :root{ --bg:#0A1320; --surface:#111D2C; --surface-2:#1A2838; --ink:#E9EFF5; --muted:#93A4B6; --line:#243447;
+    --accent:#FF6A4D; --accent-2:#FF9A70; --navy:#8FC7E3; --on-accent:#1B0904; --good:#3CCB91;
+    --glass:rgba(17,29,44,.82); --scrim:rgba(0,0,0,.6); --shadow:0 12px 32px rgba(0,0,0,.45); --shadow-s:0 2px 10px rgba(0,0,0,.35); color-scheme:dark; }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);overflow:hidden;overscroll-behavior:none}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);overflow:hidden;overscroll-behavior:none;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-#map{position:fixed;inset:0;background:var(--bg)}
+svg{display:block}
+[hidden]{display:none!important}
 
-/* Top bar */
-.top{position:fixed;left:0;right:0;top:0;z-index:500;padding:calc(var(--st) + 10px) 12px 0;pointer-events:none}
+/* ---------- Map ---------- */
+#map{position:fixed;inset:0;background:var(--bg);-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+.maplibregl-ctrl-attrib{font-size:10px}
+.maplibregl-ctrl-bottom-right{bottom:calc(var(--tabh) + 92px)}
+body.sheet-open .maplibregl-ctrl-bottom-right{bottom:calc(var(--tabh) + 50vh)}
+.pin{cursor:pointer;width:32px;height:40px;display:grid;justify-items:center;filter:drop-shadow(0 3px 5px rgba(0,0,0,.35));transition:transform .15s}
+.pin span{width:30px;height:30px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:var(--c);border:2.5px solid #fff;display:grid;place-items:center}
+.pin b{transform:rotate(45deg);color:#fff;font:700 12.5px/1 var(--body)}
+.pin.sel{transform:scale(1.28);z-index:5}
+.me{width:20px;height:20px;border-radius:50%;background:#2F7DE1;border:3px solid #fff;box-shadow:0 0 0 0 rgba(47,125,225,.5);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,125,225,.45)}70%{box-shadow:0 0 0 16px rgba(47,125,225,0)}100%{box-shadow:0 0 0 0 rgba(47,125,225,0)}}
+
+/* ---------- Map chrome ---------- */
+.map-ui{display:none}
+body[data-tab="map"] .map-ui{display:block}
+.top{position:fixed;left:0;right:0;top:0;z-index:20;padding:calc(var(--st) + 10px) 12px 0;pointer-events:none}
 .bar{display:flex;gap:8px;align-items:center;pointer-events:auto}
-.trip-btn{flex:1;min-width:0;display:flex;align-items:center;gap:10px;border:0;background:var(--surface);border-radius:14px;padding:10px 14px;box-shadow:var(--shadow);text-align:left}
-.trip-btn .t{font:700 18px/1.15 var(--display);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.trip-btn .s{font-size:12px;color:var(--muted)}
-.trip-btn .txt{min-width:0;flex:1}
-.caret{width:18px;height:18px;flex:none;color:var(--muted)}
-.icon-btn{width:46px;height:46px;flex:none;border:0;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);display:grid;place-items:center}
-.icon-btn svg{width:22px;height:22px}
+.glass{background:var(--glass);-webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px);box-shadow:var(--shadow)}
+.trip-head{flex:1;min-width:0;border:0;border-radius:18px;padding:10px 14px;display:flex;align-items:center;gap:10px;text-align:left}
+.trip-head .txt{min-width:0;flex:1}
+.trip-head .t{font:700 18px/1.15 var(--display);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trip-head .s{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sq{width:48px;height:48px;flex:none;border:0;border-radius:16px;display:grid;place-items:center}
+.sq svg{width:22px;height:22px}
 .chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px;pointer-events:auto;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:none;border:0;border-radius:999px;padding:6px 12px;background:var(--surface);box-shadow:0 2px 8px rgba(0,0,0,.12);font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.chip{flex:none;border:0;border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;white-space:nowrap;box-shadow:var(--shadow-s)}
 .chip i{width:9px;height:9px;border-radius:50%;background:var(--c)}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
-
-/* Floating buttons */
-.fabs{position:fixed;right:12px;z-index:450;display:flex;flex-direction:column;gap:10px;bottom:calc(var(--sb) + 96px);transition:bottom .25s}
-body.sheet-open .fabs{bottom:calc(var(--sb) + 54vh + 12px)}
-.fab{width:50px;height:50px;border-radius:16px;border:0;background:var(--surface);box-shadow:var(--shadow);display:grid;place-items:center}
+.fabs{position:fixed;right:12px;z-index:18;display:flex;flex-direction:column;gap:10px;bottom:calc(var(--tabh) + 96px);transition:bottom .28s}
+body.sheet-open .fabs{bottom:calc(var(--tabh) + 50vh + 12px)}
+.fab{width:52px;height:52px;border-radius:18px;border:0;display:grid;place-items:center}
 .fab svg{width:24px;height:24px}
-.fab.primary{background:var(--accent);color:var(--accent-ink)}
+.fab.primary{background:linear-gradient(160deg,var(--accent-2),var(--accent));color:#fff;box-shadow:0 10px 24px rgba(240,69,43,.4)}
 .fab.live{color:#2F7DE1}
 
-/* Bottom sheet list */
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:460;background:var(--surface);border-radius:20px 20px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.15);display:flex;flex-direction:column;height:calc(84px + var(--sb));transition:height .25s ease}
-body.sheet-open .sheet{height:calc(54vh + var(--sb))}
-.sheet-head{border:0;background:none;padding:8px 16px 12px;text-align:left;display:flex;flex-direction:column;gap:6px;width:100%}
-.grab{width:38px;height:5px;border-radius:3px;background:var(--line);align-self:center}
+/* list sheet */
+.sheet{position:fixed;left:0;right:0;bottom:var(--tabh);z-index:19;background:var(--surface);border-radius:24px 24px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.12);display:flex;flex-direction:column;height:84px;transition:height .28s ease}
+body.sheet-open .sheet{height:50vh}
+.sheet-head{border:0;background:none;padding:8px 18px 10px;text-align:left;display:flex;flex-direction:column;gap:6px;width:100%}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);align-self:center}
 .sheet-head .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.sheet-head b{font:700 17px/1.2 var(--display)}
+.sheet-head b{font:700 18px/1.2 var(--display)}
 .sheet-head span{font-size:13px;color:var(--muted)}
-.list{list-style:none;margin:0;padding:0 8px calc(var(--sb) + 12px);overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
-.item{display:flex;gap:12px;padding:10px 8px;border-radius:14px;align-items:center}
-.item:active{background:var(--chip)}
-.thumb{width:62px;height:62px;border-radius:12px;flex:none;background:var(--chip) center/cover no-repeat;display:grid;place-items:center;font:700 20px var(--display);color:var(--muted);position:relative}
-.thumb .n{position:absolute;left:-4px;top:-4px;min-width:22px;height:22px;border-radius:11px;background:var(--c);color:#fff;font:700 12px/22px var(--body);text-align:center;padding:0 5px;border:2px solid var(--surface)}
+.list{list-style:none;margin:0;padding:0 8px 12px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.item{display:flex;gap:12px;padding:9px 8px;border-radius:16px;align-items:center}
+.item:active{background:var(--surface-2)}
+.thumb{width:64px;height:64px;border-radius:14px;flex:none;background:var(--surface-2) center/cover no-repeat;display:grid;place-items:center;font:700 20px var(--display);color:var(--muted);position:relative}
+.thumb .n{position:absolute;left:-5px;top:-5px;min-width:22px;height:22px;border-radius:11px;background:var(--c);color:#fff;font:700 12px/18px var(--body);text-align:center;padding:0 5px;border:2px solid var(--surface)}
 .meta{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
 .meta b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta .sub{font-size:12.5px;color:var(--muted);display:flex;gap:6px;align-items:center;font-variant-numeric:tabular-nums}
 .meta .sub i{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
 .meta .note{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.group-title{font:600 11px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:14px 10px 4px}
-.empty{padding:20px 16px;color:var(--muted);text-align:center}
+.group-title{font:700 11px/1 var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:14px 10px 4px}
+.empty{padding:22px 16px;color:var(--muted);text-align:center}
 
-/* Detail */
-.detail{position:fixed;left:0;right:0;bottom:0;z-index:600;height:calc(86vh);background:var(--surface);border-radius:20px 20px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.3);transform:translateY(105%);transition:transform .28s ease;display:flex;flex-direction:column}
+/* place card */
+.detail{position:fixed;left:0;right:0;bottom:0;z-index:40;height:88vh;background:var(--surface);border-radius:24px 24px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.3);transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
 .detail.show{transform:none}
-.detail .scroll{overflow-y:auto;flex:1;padding-bottom:calc(var(--sb) + 20px);-webkit-overflow-scrolling:touch}
-.photos{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding:14px 16px 4px;scrollbar-width:none}
-.photos::-webkit-scrollbar{display:none}
-.photos a{flex:none;width:82%;max-width:420px;aspect-ratio:4/3;border-radius:16px;overflow:hidden;scroll-snap-align:center;background:var(--chip);display:block}
-.photos img{width:100%;height:100%;object-fit:cover;display:block}
-.photos .ph{flex:none;width:82%;aspect-ratio:4/3;border-radius:16px;background:var(--chip);display:grid;place-items:center;color:var(--muted);font-size:13px;scroll-snap-align:center}
-.d-body{padding:10px 18px 0;display:flex;flex-direction:column;gap:12px}
-.d-body h2{margin:0;font:700 26px/1.1 var(--display);letter-spacing:-.015em;text-wrap:balance}
+.detail .scroll{overflow-y:auto;flex:1;padding-bottom:calc(var(--sb) + 24px);-webkit-overflow-scrolling:touch}
+.hero-photo{position:relative;height:300px;background:var(--surface-2);border-radius:24px 24px 0 0;overflow:hidden}
+.hero-photo .strip{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.hero-photo .strip::-webkit-scrollbar{display:none}
+.hero-photo a{flex:none;width:100%;height:100%;scroll-snap-align:center;display:block}
+.hero-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.hero-photo .ph{flex:none;width:100%;display:grid;place-items:center;color:var(--muted)}
+.hero-photo .count{position:absolute;right:14px;bottom:14px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;font-variant-numeric:tabular-nums}
+.close{position:absolute;right:14px;top:14px;z-index:3;width:38px;height:38px;border-radius:50%;border:0;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.close svg{width:18px;height:18px}
+.d-body{padding:18px 20px 0;display:flex;flex-direction:column;gap:14px}
+.d-body h2{margin:0;font:800 28px/1.08 var(--display);letter-spacing:-.02em;text-wrap:balance}
 .d-tags{display:flex;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);align-items:center;font-variant-numeric:tabular-nums}
-.tag{display:inline-flex;gap:6px;align-items:center;background:var(--chip);border-radius:999px;padding:4px 10px;color:var(--ink);font-weight:600}
+.tag{display:inline-flex;gap:6px;align-items:center;background:var(--surface-2);border-radius:999px;padding:5px 11px;color:var(--ink);font-weight:600}
 .tag i{width:8px;height:8px;border-radius:50%;background:var(--c)}
-.note-box{white-space:pre-wrap;background:var(--chip);border-radius:12px;padding:10px 12px}
-.extract{color:var(--muted);font-size:14px}
-.extract a,.credit a{color:var(--accent);text-decoration:none;font-weight:600}
+.note-box{white-space:pre-wrap;background:var(--surface-2);border-radius:14px;padding:12px 14px;border-left:3px solid var(--c)}
+.extract{color:var(--muted);font-size:14.5px;line-height:1.55}
+.extract a,.credit a,.link{color:var(--accent);text-decoration:none;font-weight:600}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.btn{border:0;border-radius:12px;padding:12px 14px;background:var(--chip);font-weight:600;text-align:center;text-decoration:none;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:8px}
-.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn{border:0;border-radius:14px;padding:13px 14px;background:var(--surface-2);font-weight:600;text-align:center;text-decoration:none;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px}
+.btn svg{width:18px;height:18px;flex:none}
+.btn.primary{background:linear-gradient(160deg,var(--accent-2),var(--accent));color:#fff}
 .btn.danger{color:var(--accent)}
 .btn.wide{grid-column:1/-1}
+.btn:disabled{opacity:.5}
 .credit{font-size:12px;color:var(--muted)}
-.close{position:absolute;right:12px;top:12px;z-index:2;width:36px;height:36px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center}
-.close svg{width:18px;height:18px}
 
-/* Dialogs */
-dialog{border:0;padding:0;border-radius:20px;background:var(--surface);color:var(--ink);width:min(560px,calc(100vw - 20px));max-height:calc(100vh - var(--st) - var(--sb) - 30px);box-shadow:var(--shadow)}
-dialog::backdrop{background:rgba(10,18,22,.5)}
+/* ---------- Panels (Trips, Account) ---------- */
+.panel{position:fixed;inset:0;z-index:30;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--st) + 14px) 18px calc(var(--tabh) + 28px);display:none}
+body[data-tab="trips"] #view-trips,body[data-tab="account"] #view-account{display:block}
+.wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:36px;height:36px;border-radius:10px}
+.brand b{font:800 20px/1 var(--display);letter-spacing:-.02em}
+.brand .grow{flex:1}
+.avatar{width:38px;height:38px;border-radius:50%;border:0;background:var(--navy);color:var(--bg);font:700 15px var(--display);display:grid;place-items:center}
+.greet h1{margin:0;font:800 34px/1.05 var(--display);letter-spacing:-.025em;text-wrap:balance}
+.greet p{margin:6px 0 0;color:var(--muted)}
+.hero{position:relative;border:0;padding:0;width:100%;text-align:left;border-radius:26px;overflow:hidden;min-height:250px;background:linear-gradient(150deg,#123B5A,#081726);color:#fff;box-shadow:var(--shadow);display:block}
+.hero .cover{position:absolute;inset:0;background:center/cover no-repeat}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 25%,rgba(0,0,0,.72))}
+.hero .grat{position:absolute;right:-60px;top:-40px;width:280px;height:280px;opacity:.25}
+.hero .in{position:relative;z-index:1;display:flex;flex-direction:column;gap:6px;padding:18px 20px 20px;min-height:250px;justify-content:flex-end}
+.hero .kicker{align-self:flex-start;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:5px 10px;border-radius:999px;margin-bottom:auto}
+.hero h2{margin:0;font:800 30px/1.05 var(--display);letter-spacing:-.02em;text-wrap:balance}
+.hero .sub{opacity:.88;font-size:14px;font-variant-numeric:tabular-nums}
+.hero .stats{display:flex;gap:16px;margin-top:8px;font-size:13px;opacity:.95}
+.hero .stats b{font:700 18px var(--display);display:block}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.sec-h h3{margin:0;font:700 19px var(--display);letter-spacing:-.01em}
+.sec-h button{border:0;background:none;color:var(--accent);font-weight:700;padding:6px 0}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.tcard{display:flex;gap:12px;align-items:center;border:0;background:var(--surface);border-radius:20px;padding:10px;text-align:left;box-shadow:var(--shadow-s);width:100%}
+.tcard .cv{width:72px;height:72px;border-radius:14px;flex:none;background:linear-gradient(150deg,#123B5A,#081726) center/cover no-repeat}
+.tcard .meta b{font:700 16px/1.2 var(--display)}
+.tcard .more{width:36px;height:36px;border-radius:12px;border:0;background:var(--surface-2);display:grid;place-items:center;flex:none}
+.tcard .more svg{width:18px;height:18px}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--surface-2);color:var(--muted)}
+.pill.now{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.pill.up{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.new-trip{border:1.5px dashed var(--line);background:none;border-radius:20px;padding:18px;color:var(--muted);font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+.new-trip svg{width:20px;height:20px}
+.card{background:var(--surface);border-radius:22px;padding:18px;box-shadow:var(--shadow-s);display:flex;flex-direction:column;gap:14px}
+.card h3{margin:0;font:700 19px var(--display)}
+.card p{margin:0;color:var(--muted)}
+.profile{display:flex;gap:14px;align-items:center}
+.profile .avatar{width:56px;height:56px;font-size:21px}
+.profile b{font:700 20px var(--display);display:block}
+.profile span{color:var(--muted);font-size:14px;word-break:break-all}
+.sync{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted)}
+.sync i{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.sync.ok i{background:var(--good)}.sync.err i{background:var(--accent)}.sync.busy i{background:#E5A11A}
+.err-msg{color:var(--accent);font-size:13.5px;margin:0}
+.steps{margin:0;padding-left:20px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+.steps code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-size:13px}
+
+/* ---------- Tab bar ---------- */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:space-around;padding:6px 8px var(--sb);height:var(--tabh);border-top:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:600;padding-top:4px}
+.tabs svg{width:25px;height:25px}
+.tabs button[aria-selected="true"]{color:var(--accent)}
+
+/* ---------- Dialogs ---------- */
+dialog{border:0;padding:0;border-radius:24px;background:var(--surface);color:var(--ink);width:min(560px,calc(100vw - 20px));max-height:calc(100vh - var(--st) - var(--sb) - 30px);box-shadow:var(--shadow)}
+dialog::backdrop{background:var(--scrim)}
 .dlg{display:flex;flex-direction:column;max-height:inherit}
-.dlg header{display:flex;justify-content:space-between;align-items:center;padding:16px 18px 8px}
-.dlg header h3{margin:0;font:700 20px var(--display)}
-.dlg .inner{overflow-y:auto;padding:4px 18px 18px;display:flex;flex-direction:column;gap:14px}
-.x{border:0;background:var(--chip);width:34px;height:34px;border-radius:50%;display:grid;place-items:center}
+.dlg header{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 8px}
+.dlg header h3{margin:0;font:700 21px var(--display)}
+.dlg .inner{overflow-y:auto;padding:4px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.x{border:0;background:var(--surface-2);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none}
 .x svg{width:16px;height:16px}
-label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-input[type=text],input[type=search],select,textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:11px 12px;font-size:16px;text-transform:none;letter-spacing:0;font-weight:400}
-textarea{min-height:80px;resize:vertical}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+input[type=text],input[type=search],input[type=email],input[type=date],select,textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:12px 13px;font-size:16px;text-transform:none;letter-spacing:0;font-weight:400;min-height:48px}
+input.code{font:700 26px/1 var(--display);letter-spacing:.35em;text-align:center}
+textarea{min-height:84px;resize:vertical}
 .row2{display:flex;gap:8px}
 .row2>*{flex:1;min-width:0}
-.results{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-.results button{width:100%;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:9px 12px;font-size:14px}
+.results{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.results button{width:100%;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:10px 12px;font-size:14px}
 .results small{display:block;color:var(--muted);font-size:12px}
 .hint{font-size:13px;color:var(--muted);margin:0}
-.picked{font-size:13px;background:var(--chip);border-radius:10px;padding:8px 10px;font-variant-numeric:tabular-nums}
-.trip-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.trip-list button{width:100%;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:11px 12px;text-align:left}
-.trip-list button[aria-current="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.trip-list span{color:var(--muted);font-size:13px}
-.section-t{font:600 11px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 -4px}
+.picked{font-size:13px;background:var(--surface-2);border-radius:12px;padding:9px 11px;font-variant-numeric:tabular-nums}
+.section-t{font:700 11px/1 var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:8px 0 -4px}
 .groups{display:flex;flex-direction:column;gap:6px}
 .g-row{display:flex;gap:8px;align-items:center}
-.swatch{width:40px;height:40px;flex:none;border-radius:10px;border:0;background:var(--c)}
+.swatch{width:44px;height:44px;flex:none;border-radius:12px;border:0;background:var(--c)}
 .g-row input{flex:1}
-.g-row .x{flex:none}
 .grid-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.toast{position:fixed;left:50%;top:calc(var(--st) + 120px);transform:translate(-50%,-10px);z-index:900;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;max-width:calc(100vw - 32px);text-align:center}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px}
+.seg button{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 6px;font-size:13px;font-weight:600}
+.seg button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.toast{position:fixed;left:50%;top:calc(var(--st) + 14px);transform:translate(-50%,-12px);z-index:90;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:14px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.22s;max-width:calc(100vw - 32px);text-align:center;box-shadow:var(--shadow)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-
-/* Map pins */
-.pin{background:none;border:0}
-.pin span{display:grid;place-items:center;width:28px;height:28px;border-radius:50% 50% 50% 6px;transform:rotate(-45deg);background:var(--c);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
-.pin b{transform:rotate(45deg);color:#fff;font:700 12px/1 var(--body)}
-.pin.sel span{width:36px;height:36px;margin:-4px 0 0 -4px}
-.tiles-dark{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6)}
-.leaflet-control-attribution{font-size:9px;background:rgba(255,255,255,.7)!important;margin-bottom:calc(var(--sb) + 88px)!important}
-@media (prefers-color-scheme: dark){.leaflet-control-attribution{background:rgba(0,0,0,.5)!important;color:#aaa}.leaflet-control-attribution a{color:#ccc}}
-@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
-<body>
+<body data-tab="trips">
 <div id="map" aria-label="Map"></div>
 
-<div class="top">
-  <div class="bar">
-    <button class="trip-btn" id="tripBtn" aria-label="Switch or edit trip">
-      <span class="txt"><div class="t" id="tripName">Trip</div><div class="s" id="tripSub"></div></span>
-      <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
+<!-- ============ Map chrome ============ -->
+<div class="map-ui">
+  <div class="top">
+    <div class="bar">
+      <button class="trip-head glass" id="tripHead" aria-label="Trip settings">
+        <span class="txt"><div class="t" id="tripName">Trip</div><div class="s" id="tripSub"></div></span>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>
+      </button>
+      <button class="sq glass" id="fitBtn" aria-label="Show all places">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div class="fabs">
+    <button class="fab glass" id="locBtn" aria-label="Show my location">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2l7 19-7-4-7 4 7-19z" transform="rotate(45 12 12)"/></svg>
     </button>
-    <button class="icon-btn" id="fitBtn" aria-label="Show all places on the map">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    <button class="fab primary" id="addBtn" aria-label="Add place">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
     </button>
   </div>
-  <div class="chips" id="chips"></div>
+  <section class="sheet" id="sheet">
+    <button class="sheet-head" id="sheetHead" aria-label="Open or close the list">
+      <span class="grab"></span>
+      <span class="row"><b id="sheetTitle">Places</b><span id="sheetCount"></span></span>
+    </button>
+    <ul class="list" id="list"></ul>
+  </section>
 </div>
-
-<div class="fabs">
-  <button class="fab" id="locBtn" aria-label="Show my location">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-  </button>
-  <button class="fab primary" id="addBtn" aria-label="Add place">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
-  </button>
-</div>
-
-<section class="sheet" id="sheet">
-  <button class="sheet-head" id="sheetHead" aria-label="Open or close list">
-    <span class="grab"></span>
-    <span class="row"><b id="sheetTitle">Places</b><span id="sheetCount"></span></span>
-  </button>
-  <ul class="list" id="list"></ul>
-</section>
 
 <section class="detail" id="detail" aria-hidden="true">
-  <button class="close" id="detailClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  <button class="close" id="detailClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   <div class="scroll" id="detailScroll"></div>
 </section>
 
-<!-- Trip dialog -->
-<dialog id="tripDlg">
-  <div class="dlg">
-    <header><h3>Trips</h3><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
-    <div class="inner">
-      <ul class="trip-list" id="tripList"></ul>
-      <div class="grid-btns">
-        <button class="btn" id="newTrip">New trip</button>
-        <button class="btn" id="importBtn">Import KML / backup</button>
-      </div>
-      <input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
-      <p class="section-t">This trip</p>
-      <label class="f">Name<input type="text" id="tripRename"></label>
-      <p class="section-t">Groups (days, cities, categories)</p>
-      <div class="groups" id="groupEd"></div>
-      <button class="btn" id="addGroup">Add group</button>
-      <div class="grid-btns">
-        <button class="btn" id="exportBtn">Export backup</button>
-        <button class="btn danger" id="delTrip">Delete trip</button>
-      </div>
-      <p class="hint">Everything is saved on this device only. Export a backup now and then; if Safari clears the site data, just import it again.</p>
-    </div>
+<!-- ============ Trips hub ============ -->
+<main class="panel" id="view-trips">
+  <div class="wrap">
+    <div class="brand"><img src="logo.svg" alt=""><b>Trip Atlas</b><span class="grow"></span><button class="avatar" id="hubAvatar" aria-label="Account">?</button></div>
+    <div class="greet"><h1 id="greet">Where to next?</h1><p id="greetSub"></p></div>
+    <div id="heroSlot"></div>
+    <section class="wrap" style="gap:12px" id="upSec">
+      <div class="sec-h"><h3>Your trips</h3><button id="importBtn2">Import</button></div>
+      <div class="cards" id="tripCards"></div>
+      <button class="new-trip" id="newTripBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Plan a new trip</button>
+    </section>
+    <section class="wrap" style="gap:12px" id="pastSec" hidden>
+      <div class="sec-h"><h3>Past trips</h3></div>
+      <div class="cards" id="pastCards"></div>
+    </section>
   </div>
+</main>
+
+<!-- ============ Account ============ -->
+<main class="panel" id="view-account">
+  <div class="wrap" id="accountWrap"></div>
+</main>
+
+<!-- ============ Tab bar ============ -->
+<nav class="tabs glass" role="tablist">
+  <button role="tab" data-tab="trips" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="3"/><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7M3 12h18"/></svg>Trips</button>
+  <button role="tab" data-tab="map" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4z"/><path d="M9 4v13.5M15 6.5V20"/></svg>Map</button>
+  <button role="tab" data-tab="account" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.4-3.6 4.3-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg>Account</button>
+</nav>
+
+<!-- ============ Dialogs ============ -->
+<dialog id="tripDlg">
+  <form class="dlg" id="tripForm" method="dialog">
+    <header><h3 id="tfTitle">Trip settings</h3><button type="button" class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+    <div class="inner">
+      <label class="f">Name<input type="text" id="tfName" placeholder="e.g. Lisbon in December" required></label>
+      <div class="row2">
+        <label class="f">Start<input type="date" id="tfStart"></label>
+        <label class="f">End<input type="date" id="tfEnd"></label>
+      </div>
+      <div id="tfExisting">
+        <p class="section-t">Groups (days, cities, categories)</p>
+        <div class="groups" id="groupEd" style="margin-top:14px"></div>
+        <button type="button" class="btn" id="addGroup" style="margin-top:8px;width:100%">Add group</button>
+      </div>
+      <button type="submit" class="btn primary" id="tfSave">Save</button>
+      <div class="grid-btns" id="tfMore">
+        <button type="button" class="btn" id="exportTrip">Export backup</button>
+        <button type="button" class="btn danger" id="delTrip">Delete trip</button>
+      </div>
+    </div>
+  </form>
 </dialog>
 
-<!-- Place dialog -->
 <dialog id="placeDlg">
   <form class="dlg" id="placeForm" method="dialog">
-    <header><h3 id="pfTitle">New place</h3><button type="button" class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+    <header><h3 id="pfTitle">New place</h3><button type="button" class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
     <div class="inner">
       <div class="row2">
         <input type="search" id="pfQ" placeholder="Search a place or address" enterkeyhint="search">
@@ -228,14 +324,14 @@ textarea{min-height:80px;resize:vertical}
         <button type="button" class="btn" id="pfCenter">Map center</button>
         <button type="button" class="btn" id="pfHere">My location</button>
       </div>
-      <div class="picked" id="pfPicked">Pick a result, use the map center, or long-press on the map.</div>
+      <div class="picked" id="pfPicked"></div>
       <label class="f">Name<input type="text" id="pfName" required></label>
       <label class="f">Group<select id="pfGroup"></select></label>
       <label class="f">Notes<textarea id="pfNote" placeholder="Time, price, tip…"></textarea></label>
       <label class="f">Wikipedia article (optional)<input type="text" id="pfWiki" placeholder="e.g. Rosenborg Castle"></label>
-      <p class="hint">Photos are found automatically from the name and position. If they are wrong, type the English Wikipedia article title here.</p>
+      <p class="hint">Photos are found automatically from the name and position. If they look wrong, type the English Wikipedia article title.</p>
       <div class="grid-btns">
-        <button type="submit" class="btn primary wide" id="pfSave">Save</button>
+        <button type="submit" class="btn primary wide">Save</button>
         <button type="button" class="btn" id="pfUp" hidden>Move up</button>
         <button type="button" class="btn danger" id="pfDel" hidden>Delete</button>
       </div>
@@ -243,456 +339,584 @@ textarea{min-height:80px;resize:vertical}
   </form>
 </dialog>
 
-<!-- Simple name dialog -->
-<dialog id="nameDlg">
-  <form class="dlg" method="dialog" id="nameForm">
-    <header><h3>New trip</h3><button type="button" class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
-    <div class="inner">
-      <label class="f">Name<input type="text" id="newTripName" placeholder="e.g. Lisbon, December" required></label>
-      <button type="submit" class="btn primary">Create</button>
-    </div>
-  </form>
-</dialog>
-
+<input type="file" id="fileIn" accept=".kml,.json,application/json,application/vnd.google-earth.kml+xml,text/xml" hidden>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 "use strict";
-const PAL = ['#C8372D','#2F6FB0','#2E8B57','#C9900C','#7A4EB3','#17898A','#D0621C','#5B6770','#B03A78'];
-const uid = () => Math.random().toString(36).slice(2,10);
-const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* ================= Basics ================= */
+const PAL=['#F0452B','#2F6FB0','#1E9E6A','#D99A0B','#7A4EB3','#0E8A8B','#E0621C','#5B6B7C','#C0397E'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
+const load=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
+const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const ICON={
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
+  nav:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>',
+  apple:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4z"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>'
+};
+let tt;function toast(m){const el=$('#toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3200)}
 
-/* ---------- Seed trip ---------- */
-function P(name, lat, lon, note, wiki){ return {id:uid(), name, lat, lon, note:note||'', wiki:wiki||''}; }
+/* ================= Seed trip ================= */
+function P(group,name,lat,lon,note,wiki){return{id:uid(),group,name,lat,lon,note:note||'',wiki:wiki||''}}
 function seedTrip(){
-  const g = [
-    {id:'base', name:'Base & transport', color:'#5B6770'},
-    {id:'sab', name:'Sat 24 Oct', color:'#C8372D'},
-    {id:'dom', name:'Sun 25 Oct', color:'#2E8B57'},
-    {id:'seg', name:'Mon 26 Oct · Malmö', color:'#C9900C'}
-  ];
-  const add = (gid, arr) => arr.map(p => (p.group = gid, p));
-  const places = [
-    ...add('base',[
-      P('CityHub Copenhagen',55.6716711,12.5465597,'Hotel. Check-in 3 pm, check-out noon. Sauna 8 am–10 pm.'),
-      P('Copenhagen Airport (CPH)',55.6300,12.6490,'Arrive Sat 07:55 · depart Mon 18:20.','Copenhagen Airport'),
-      P('København H',55.6727,12.5647,'Trains to the airport, Malmö and Humlebæk.','Copenhagen Central Station'),
-      P('Kødbyen',55.6682,12.5605,'Bars and restaurants near the hotel.','Kødbyen')]),
-    ...add('sab',[
-      P('Ny Carlsberg Glyptotek',55.67298,12.572543,'10:00 · optional. Copenhagen Card. Greek and Roman galleries partly closed in 2026.','Ny Carlsberg Glyptotek'),
-      P('Christiansborg',55.6763218,12.5803274,'11:15. Palace on the Card; tower is free.','Christiansborg Palace'),
-      P('Black Diamond',55.6733994,12.5826588,'12:30. Free, harbour views.','Black Diamond (library)'),
-      P('LEGO Store',55.678546,12.575896,'13:15. On Strøget; lunch nearby.'),
-      P('Old University Library',55.6801391,12.5732044,'14:00. Only open on Saturday on this trip. Small fee.'),
-      P('Rosenborg',55.6858274,12.5772687,'14:45. Show the Card QR at the ticket desk; can sell out in the afternoon.','Rosenborg Castle'),
-      P("Frederiks Kirke",55.685078,12.5895549,'16:00. Free, closes at 5 pm.',"Frederik's Church"),
-      P('Amalienborg',55.6840588,12.5930201,'16:30. Palace square.','Amalienborg'),
-      P('Canal Tours (Nyhavn)',55.6805274,12.587945,'16:45. Copenhagen Card. Last departures around 18:30.'),
-      P('Nyhavn',55.679776,12.5913041,'18:00. Lights on after sunset.','Nyhavn'),
-      P('Gasoline Grill',55.683242,12.5851505,'18:45. Open until 10 pm on Saturday.'),
-      P('Tivoli Gardens',55.6736629,12.5682338,'20:00. Halloween season; open until midnight Saturday. Rides extra.','Tivoli Gardens')]),
-    ...add('dom',[
-      P('Designmuseum Danmark',55.6864299,12.5936135,'10:00. Copenhagen Card.','Designmuseum Danmark'),
-      P('Kastellet',55.691376,12.594301,'11:00. Star-shaped fortress.','Kastellet, Copenhagen'),
-      P('The Little Mermaid',55.69286,12.5992828,'11:30. Then bus from Østerport.','The Little Mermaid (statue)'),
-      P('Grundtvigs Kirke',55.7166277,12.534012,'12:30. Sunday 12:30–15:45. Closed Sat and Mon.',"Grundtvig's Church"),
-      P('Louisiana',55.969549,12.542784,'14:30–18:00. Train to Humlebæk, covered by the Card.','Louisiana Museum of Modern Art'),
-      P('Christianshavns Kanal',55.6755541,12.5926294,'19:30. Dinner by the canal.','Christianshavn Canal')]),
-    ...add('seg',[
-      P('Malmö Centralstation',55.6090669,12.9999228,'09:40. Luggage lockers. Bring your passport.','Malmö Central Station'),
-      P('Sankt Petri Kyrka',55.6069369,13.0033475,'10:00. Free.',"St. Peter's Church, Malmö"),
-      P('Stortorget',55.6060,13.0011,'Main square.','Stortorget, Malmö'),
-      P('Lilla Torg',55.6051846,12.9988061,'10:45. Half-timbered houses; fika.','Lilla torg'),
-      P('Malmöhus',55.6049011,12.9875581,'11:45. Closed Mondays; see the outside and the parks.','Malmö Castle'),
-      P('Ribersborgs Kallbadhus',55.604893,12.9657333,'12:30. Sauna on the pier, open Mondays. Bring a towel.'),
-      P('Turning Torso',55.6133242,12.976362,'14:30. Train to the airport at 15:45 (22 min).','Turning Torso'),
-      P('Möllevångstorget',55.5918121,13.0086553,'Optional. Cheap food.','Möllevångstorget')])
-  ];
-  return {id:uid(), name:'Copenhagen + Malmö', dates:'24–26 Oct 2026', groups:g, places};
+  return {id:uid(),name:'Copenhagen + Malmö',start:'2026-10-24',end:'2026-10-26',updated:Date.now(),
+    groups:[{id:'base',name:'Base & transport',color:'#5B6B7C'},{id:'sat',name:'Sat 24 Oct',color:'#F0452B'},{id:'sun',name:'Sun 25 Oct',color:'#1E9E6A'},{id:'mon',name:'Mon 26 Oct · Malmö',color:'#D99A0B'}],
+    places:[
+      P('base','CityHub Copenhagen',55.6716711,12.5465597,'Hotel. Check-in 3 pm, check-out noon. Sauna 8 am–10 pm.'),
+      P('base','Copenhagen Airport (CPH)',55.6300,12.6490,'Arrive Sat 07:55 · depart Mon 18:20.','Copenhagen Airport'),
+      P('base','København H',55.6727,12.5647,'Trains to the airport, Malmö and Humlebæk.','Copenhagen Central Station'),
+      P('base','Kødbyen',55.6682,12.5605,'Bars and restaurants near the hotel.','Kødbyen'),
+      P('sat','Ny Carlsberg Glyptotek',55.67298,12.572543,'10:00 · optional. Copenhagen Card. Greek and Roman galleries partly closed in 2026.','Ny Carlsberg Glyptotek'),
+      P('sat','Christiansborg',55.6763218,12.5803274,'11:15. Palace on the Card; tower is free.','Christiansborg Palace'),
+      P('sat','Black Diamond',55.6733994,12.5826588,'12:30. Free, harbour views.','Black Diamond (library)'),
+      P('sat','LEGO Store',55.678546,12.575896,'13:15. On Strøget; lunch nearby.'),
+      P('sat','Old University Library',55.6801391,12.5732044,'14:00. Only open on Saturday on this trip. Small fee.'),
+      P('sat','Rosenborg',55.6858274,12.5772687,'14:45. Show the Card QR at the ticket desk; can sell out in the afternoon.','Rosenborg Castle'),
+      P('sat',"Frederik's Church",55.685078,12.5895549,'16:00. Free, closes at 5 pm.',"Frederik's Church"),
+      P('sat','Amalienborg',55.6840588,12.5930201,'16:30. Palace square.','Amalienborg'),
+      P('sat','Canal Tours (Nyhavn)',55.6805274,12.587945,'16:45. Copenhagen Card. Last departures around 18:30.'),
+      P('sat','Nyhavn',55.679776,12.5913041,'18:00. Lights on after sunset.','Nyhavn'),
+      P('sat','Gasoline Grill',55.683242,12.5851505,'18:45. Open until 10 pm on Saturday.'),
+      P('sat','Tivoli Gardens',55.6736629,12.5682338,'20:00. Halloween season; open until midnight Saturday. Rides extra.','Tivoli Gardens'),
+      P('sun','Designmuseum Danmark',55.6864299,12.5936135,'10:00. Copenhagen Card.','Designmuseum Danmark'),
+      P('sun','Kastellet',55.691376,12.594301,'11:00. Star-shaped fortress.','Kastellet, Copenhagen'),
+      P('sun','The Little Mermaid',55.69286,12.5992828,'11:30. Then bus from Østerport.','The Little Mermaid (statue)'),
+      P('sun','Grundtvig’s Church',55.7166277,12.534012,'12:30. Sunday 12:30–15:45. Closed Sat and Mon.',"Grundtvig's Church"),
+      P('sun','Louisiana Museum',55.969549,12.542784,'14:30–18:00. Train to Humlebæk, covered by the Card.','Louisiana Museum of Modern Art'),
+      P('sun','Christianshavn Canal',55.6755541,12.5926294,'19:30. Dinner by the canal.','Christianshavn Canal'),
+      P('mon','Malmö Central Station',55.6090669,12.9999228,'09:40. Luggage lockers. Bring your passport.','Malmö Central Station'),
+      P('mon','St. Peter’s Church',55.6069369,13.0033475,'10:00. Free.',"St. Peter's Church, Malmö"),
+      P('mon','Stortorget',55.6060,13.0011,'Main square.','Stortorget, Malmö'),
+      P('mon','Lilla Torg',55.6051846,12.9988061,'10:45. Half-timbered houses; fika.','Lilla torg'),
+      P('mon','Malmö Castle',55.6049011,12.9875581,'11:45. Closed Mondays; see the outside and the parks.','Malmö Castle'),
+      P('mon','Ribersborgs Kallbadhus',55.604893,12.9657333,'12:30. Sauna on the pier, open Mondays. Bring a towel.'),
+      P('mon','Turning Torso',55.6133242,12.976362,'14:30. Train to the airport at 15:45 (22 min).','Turning Torso'),
+      P('mon','Möllevångstorget',55.5918121,13.0086553,'Optional. Cheap food.','Möllevångstorget')
+    ]};
 }
+function blankTrip(name,start,end){return{id:uid(),name,start:start||'',end:end||'',updated:Date.now(),groups:[{id:uid(),name:'Day 1',color:PAL[0]}],places:[]}}
 
-/* ---------- Storage ---------- */
-const KEY='roteiros.v1', IKEY='roteiros.info.v1';
-function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
-function store(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-let S = load(KEY);
-if(!S || !Array.isArray(S.trips) || !S.trips.length){ const t=seedTrip(); S={trips:[t], current:t.id}; store(KEY,S); }
-let INFO = load(IKEY) || {};
-const save = () => store(KEY,S);
-const trip = () => S.trips.find(t=>t.id===S.current) || S.trips[0];
-const groupOf = (t,p) => t.groups.find(g=>g.id===p.group) || {name:'No group', color:'#5B6770', id:''};
+/* ================= State ================= */
+const CFG=window.ATLAS_CONFIG||{};
+const sb=(CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase)?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}}):null;
+let user=null;                 // {id,email,name}
+let S=null;                    // {trips,current,prefs}
+let tab='trips', filter='all', selected=null;
+const keyFor=u=>'atlas.v2.'+(u?u.id:'guest');
+let INFO=load('atlas.info.v1')||load('roteiros.info.v1')||{};
 
-/* ---------- Map ---------- */
-const dark = matchMedia('(prefers-color-scheme: dark)');
-const map = L.map('map',{zoomControl:false, tapHold:true}).setView([55.68,12.57],13);
-let tiles;
-function setTiles(){
-  if(tiles) map.removeLayer(tiles);
-  tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    maxZoom:19, className: dark.matches ? 'tiles-dark' : '',
-    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-  }).addTo(map);
+function normTrip(t){t.id=t.id||uid();t.groups=t.groups||[];t.places=t.places||[];t.updated=t.updated||Date.now();t.start=t.start||'';t.end=t.end||'';return t}
+function loadGuest(){
+  let s=load(keyFor(null));
+  if(!s){
+    const old=load('roteiros.v1');
+    if(old&&Array.isArray(old.trips)&&old.trips.length){ s={trips:old.trips,current:old.current,prefs:{}}; }
+    else { const t=seedTrip(); s={trips:[t],current:t.id,prefs:{}}; }
+  }
+  return s;
 }
-setTiles(); dark.addEventListener?.('change', setTiles);
+function loadState(){
+  S=user?(load(keyFor(user))||{trips:[],current:null,prefs:{}}):loadGuest();
+  S.trips=(S.trips||[]).map(normTrip); S.prefs=S.prefs||{}; S.deleted=S.deleted||[];
+  if(!S.trips.find(t=>t.id===S.current)) S.current=S.trips[0]?.id||null;
+  save();
+}
+function save(){store(keyFor(user),S)}
+const trip=()=>S.trips.find(t=>t.id===S.current)||S.trips[0]||null;
+const groupOf=(t,p)=>t.groups.find(g=>g.id===p.group)||{id:'',name:'No group',color:'#5B6B7C'};
+function touch(t){t.updated=Date.now();save();schedulePush(t)}
 
-let filter='all', selected=null;
-const markers = new Map();
-const layer = L.layerGroup().addTo(map);
+/* ================= Dates ================= */
+const D=s=>s?new Date(s+'T12:00:00'):null;
+function fmtRange(t){
+  if(!t.start) return '';
+  const a=D(t.start),b=D(t.end||t.start),o={day:'numeric',month:'short'};
+  const y=b.getFullYear();
+  if(t.start===t.end||!t.end) return a.toLocaleDateString('en-GB',{...o,year:'numeric'});
+  if(a.getMonth()===b.getMonth()&&a.getFullYear()===b.getFullYear()) return `${a.getDate()}–${b.toLocaleDateString('en-GB',o)} ${y}`;
+  return `${a.toLocaleDateString('en-GB',o)} – ${b.toLocaleDateString('en-GB',o)} ${y}`;
+}
+function status(t){
+  if(!t.start) return null;
+  const today=new Date();today.setHours(12,0,0,0);
+  const s=D(t.start),e=D(t.end||t.start);
+  if(today<s){const d=Math.round((s-today)/864e5);return{kind:'up',label:d===1?'Tomorrow':`In ${d} days`}}
+  if(today<=e) return{kind:'now',label:'Happening now'};
+  return{kind:'past',label:'Completed'};
+}
+function nights(t){if(!t.start||!t.end)return null;return Math.round((D(t.end)-D(t.start))/864e5)+1}
 
-function visiblePlaces(){ const t=trip(); return t.places.filter(p => filter==='all' || p.group===filter); }
-function orderIndex(t,p){ return t.places.filter(q=>q.group===p.group).indexOf(p)+1; }
+/* ================= Map ================= */
+const darkMq=matchMedia('(prefers-color-scheme: dark)');
+const STYLES={liberty:'https://tiles.openfreemap.org/styles/liberty',bright:'https://tiles.openfreemap.org/styles/bright',positron:'https://tiles.openfreemap.org/styles/positron',dark:'https://tiles.openfreemap.org/styles/dark'};
+const styleName=()=>{const p=S?.prefs?.mapStyle||'auto';return p==='auto'?(darkMq.matches?'dark':'liberty'):p};
+let map, currentStyle;
+function initMap(){
+  currentStyle=styleName();
+  map=new maplibregl.Map({container:'map',style:STYLES[currentStyle],center:[12.57,55.68],zoom:12,attributionControl:{compact:true},dragRotate:false,pitchWithRotate:false,touchPitch:false});
+  map.touchZoomRotate.disableRotation();
+  map.on('error',e=>{ if(String(e?.error?.message||'').includes('Failed to fetch')) toast('Map tiles need a connection.'); });
+  // long press / right click to add a place
+  let lp=null,lpt=null;const clear=()=>{clearTimeout(lpt);lp=null};
+  map.on('touchstart',e=>{ if(e.originalEvent.touches.length!==1){clear();return} lp=e.point; lpt=setTimeout(()=>{const ll=map.unproject(lp);clear();navigator.vibrate?.(10);openPlaceForm(null,{lat:ll.lat,lon:ll.lng})},600) });
+  map.on('touchmove',e=>{ if(lp&&(Math.abs(e.point.x-lp.x)>8||Math.abs(e.point.y-lp.y)>8)) clear() });
+  map.on('touchend',clear); map.on('touchcancel',clear); map.on('dragstart',clear); map.on('zoomstart',clear);
+  map.on('contextmenu',e=>openPlaceForm(null,{lat:e.lngLat.lat,lon:e.lngLat.lng}));
+}
+function applyStyle(){const n=styleName();if(map&&n!==currentStyle){currentStyle=n;map.setStyle(STYLES[n])}}
+darkMq.addEventListener?.('change',applyStyle);
 
+const markers=new Map();
+function visiblePlaces(){const t=trip();return t?t.places.filter(p=>filter==='all'||p.group===filter):[]}
+function orderIndex(t,p){return t.places.filter(q=>q.group===p.group).indexOf(p)+1}
 function renderMarkers(){
-  layer.clearLayers(); markers.clear();
-  const t=trip();
+  for(const m of markers.values()) m.remove(); markers.clear();
+  const t=trip(); if(!t||!map) return;
   for(const p of visiblePlaces()){
     const g=groupOf(t,p);
-    const icon=L.divIcon({className:'pin'+(p.id===selected?' sel':''), html:`<span style="--c:${g.color};background:${g.color}"><b>${orderIndex(t,p)}</b></span>`, iconSize:[28,28], iconAnchor:[6,30]});
-    const m=L.marker([p.lat,p.lon],{icon, title:p.name, zIndexOffset:p.id===selected?1000:0}).addTo(layer);
-    m.on('click',()=>openDetail(p.id));
-    markers.set(p.id,m);
+    const el=document.createElement('div');
+    el.className='pin'+(p.id===selected?' sel':''); el.style.setProperty('--c',g.color);
+    el.innerHTML=`<span><b>${orderIndex(t,p)}</b></span>`; el.title=p.name;
+    el.addEventListener('click',e=>{e.stopPropagation();openDetail(p.id)});
+    markers.set(p.id,new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat([p.lon,p.lat]).addTo(map));
   }
 }
-function fitAll(){
-  const ps=visiblePlaces(); if(!ps.length) return;
-  const b=L.latLngBounds(ps.map(p=>[p.lat,p.lon]));
-  map.fitBounds(b,{paddingTopLeft:[30,130], paddingBottomRight:[30, document.body.classList.contains('sheet-open')? innerHeight*0.55 : 110], maxZoom:16});
+function fitAll(animate=true){
+  const ps=visiblePlaces(); if(!ps.length||!map) return;
+  const b=new maplibregl.LngLatBounds(); ps.forEach(p=>b.extend([p.lon,p.lat]));
+  const tabh=62, bottom=document.body.classList.contains('sheet-open')?innerHeight*0.5+tabh+20:tabh+110;
+  map.fitBounds(b,{padding:{top:170,bottom,left:40,right:40},maxZoom:15.5,duration:animate?700:0});
 }
 
-/* ---------- Location ---------- */
-let me=null, meDot=null, meAcc=null, watchId=null, firstFix=false;
+/* ================= Location ================= */
+let me=null,meMarker=null,watchId=null,firstFix=false;
 function startLocate(){
-  if(!('geolocation' in navigator)){ toast('This browser does not support location.'); return; }
-  if(watchId!==null){ if(me) map.flyTo([me.lat,me.lon], Math.max(map.getZoom(),15)); return; }
+  if(!('geolocation' in navigator)){toast('This browser does not support location.');return}
+  if(watchId!==null){ if(me) map.easeTo({center:[me.lon,me.lat],zoom:Math.max(map.getZoom(),15)}); return }
   firstFix=true; toast('Finding your location…');
-  watchId = navigator.geolocation.watchPosition(pos=>{
-    me={lat:pos.coords.latitude, lon:pos.coords.longitude, acc:pos.coords.accuracy};
-    if(!meDot){
-      meAcc=L.circle([me.lat,me.lon],{radius:me.acc, color:'#2F7DE1', weight:1, fillOpacity:.12}).addTo(map);
-      meDot=L.circleMarker([me.lat,me.lon],{radius:8, color:'#fff', weight:3, fillColor:'#2F7DE1', fillOpacity:1}).addTo(map);
-    } else { meDot.setLatLng([me.lat,me.lon]); meAcc.setLatLng([me.lat,me.lon]).setRadius(me.acc); }
-    if(firstFix){ firstFix=false; map.flyTo([me.lat,me.lon],15); }
-    $('#locBtn').classList.add('live');
-    renderList(true);
-  }, err=>{
-    watchId=null;
-    toast(err.code===1 ? 'Location is blocked. Turn it on in Settings › Privacy & Security › Location Services › Safari Websites.' : 'Could not get your location right now.');
-  }, {enableHighAccuracy:true, maximumAge:15000, timeout:20000});
+  watchId=navigator.geolocation.watchPosition(pos=>{
+    me={lat:pos.coords.latitude,lon:pos.coords.longitude};
+    if(!meMarker){const el=document.createElement('div');el.className='me';meMarker=new maplibregl.Marker({element:el}).setLngLat([me.lon,me.lat]).addTo(map)}
+    else meMarker.setLngLat([me.lon,me.lat]);
+    if(firstFix){firstFix=false;map.easeTo({center:[me.lon,me.lat],zoom:15})}
+    $('#locBtn').classList.add('live'); renderList(true);
+  },err=>{watchId=null;toast(err.code===1?'Location is off. Turn it on in Settings › Privacy & Security › Location Services › Safari Websites.':'Could not get your location right now.')},{enableHighAccuracy:true,maximumAge:15000,timeout:20000});
 }
 function dist(p){
   if(!me) return '';
-  const R=6371e3, r=x=>x*Math.PI/180;
-  const dphi=r(p.lat-me.lat), dl=r(p.lon-me.lon);
-  const a=Math.sin(dphi/2)**2+Math.cos(r(me.lat))*Math.cos(r(p.lat))*Math.sin(dl/2)**2;
-  const d=2*R*Math.asin(Math.sqrt(a));
-  return d<1000 ? `${Math.round(d/10)*10} m` : `${(d/1000).toLocaleString('en-GB',{maximumFractionDigits:d<10000?1:0})} km`;
+  const r=x=>x*Math.PI/180,R=6371e3,a=Math.sin(r(p.lat-me.lat)/2)**2+Math.cos(r(me.lat))*Math.cos(r(p.lat))*Math.sin(r(p.lon-me.lon)/2)**2,d=2*R*Math.asin(Math.sqrt(a));
+  return d<1000?`${Math.round(d/10)*10} m`:`${(d/1000).toLocaleString('en-GB',{maximumFractionDigits:d<10000?1:0})} km`;
 }
 
-/* ---------- Photos & descriptions (Wikipedia + Wikimedia Commons) ---------- */
-const WP='https://en.wikipedia.org/w/api.php', CM='https://commons.wikimedia.org/w/api.php';
-const q = (base, params) => fetch(base+'?'+new URLSearchParams({format:'json', origin:'*', ...params})).then(r=>r.json());
-const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2 && !['the','and','das','dos','del','kirke','church','copenhagen','malmo'].includes(w));
-const similar = (a,b) => { const A=norm(a), B=new Set(norm(b)); return A.filter(w=>B.has(w)).length; };
-const km = (a,b,c,d) => { const r=x=>x*Math.PI/180; const x=(r(d)-r(b))*Math.cos(r((a+c)/2)), y=r(c)-r(a); return Math.sqrt(x*x+y*y)*6371; };
-
+/* ================= Photos (Wikipedia + Commons) ================= */
+const WP='https://en.wikipedia.org/w/api.php',CM='https://commons.wikimedia.org/w/api.php';
+const q=(base,params)=>fetch(base+'?'+new URLSearchParams({format:'json',origin:'*',...params})).then(r=>r.json());
+const norm=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!['the','and','church','copenhagen','malmo','museum'].includes(w));
+const similar=(a,b)=>{const B=new Set(norm(b));return norm(a).filter(w=>B.has(w)).length};
+const km=(a,b,c,d)=>{const r=x=>x*Math.PI/180,x=(r(d)-r(b))*Math.cos(r((a+c)/2)),y=r(c)-r(a);return Math.sqrt(x*x+y*y)*6371};
 async function wpPage(title){
-  const j = await q(WP,{action:'query', redirects:1, prop:'pageimages|extracts|coordinates', piprop:'thumbnail', pithumbsize:900, exintro:1, explaintext:1, exsentences:3, titles:title});
-  const pg = Object.values(j?.query?.pages||{})[0];
-  if(!pg || pg.missing!==undefined) return null;
-  return {title:pg.title, extract:pg.extract||'', image:pg.thumbnail?.source||'', coords:pg.coordinates?.[0]||null};
+  const j=await q(WP,{action:'query',redirects:1,prop:'pageimages|extracts|coordinates',piprop:'thumbnail',pithumbsize:1000,exintro:1,explaintext:1,exsentences:3,titles:title});
+  const pg=Object.values(j?.query?.pages||{})[0]; if(!pg||pg.missing!==undefined) return null;
+  return{title:pg.title,extract:pg.extract||'',image:pg.thumbnail?.source||'',coords:pg.coordinates?.[0]||null};
 }
 async function findArticle(p){
-  if(p.wiki){ const a=await wpPage(p.wiki); if(a) return a; }
-  // 1) search by name, accept if close to the place
-  const s = await q(WP,{action:'query', list:'search', srsearch:p.name, srlimit:4});
-  for(const hit of (s?.query?.search||[])){
-    const a = await wpPage(hit.title);
-    if(a && a.coords && km(p.lat,p.lon,a.coords.lat,a.coords.lon) < 1.5) return a;
-  }
-  // 2) nearby articles whose title matches the name
-  const g = await q(WP,{action:'query', list:'geosearch', gscoord:`${p.lat}|${p.lon}`, gsradius:400, gslimit:15});
-  let best=null, bs=0;
-  for(const h of (g?.query?.geosearch||[])){ const sc=similar(p.name,h.title); if(sc>bs){bs=sc; best=h;} }
-  return best ? wpPage(best.title) : null;
+  if(p.wiki){const a=await wpPage(p.wiki);if(a)return a}
+  const s=await q(WP,{action:'query',list:'search',srsearch:p.name,srlimit:4});
+  for(const h of(s?.query?.search||[])){const a=await wpPage(h.title);if(a&&a.coords&&km(p.lat,p.lon,a.coords.lat,a.coords.lon)<1.5)return a}
+  const g=await q(WP,{action:'query',list:'geosearch',gscoord:`${p.lat}|${p.lon}`,gsradius:400,gslimit:15});
+  let best=null,bs=0;for(const h of(g?.query?.geosearch||[])){const sc=similar(p.name,h.title);if(sc>bs){bs=sc;best=h}}
+  return best?wpPage(best.title):null;
 }
 async function commonsNear(lat,lon,radius){
-  const j = await q(CM,{action:'query', generator:'geosearch', ggscoord:`${lat}|${lon}`, ggsradius:radius, ggsnamespace:6, ggslimit:20, prop:'imageinfo', iiprop:'url|mime', iiurlwidth:800});
-  const pages = Object.values(j?.query?.pages||{});
-  return pages.map(pg=>({pg, ii:pg.imageinfo?.[0]}))
-    .filter(x=>x.ii && /jpeg|png|webp/.test(x.ii.mime||''))
-    .sort((a,b)=>(a.pg.index||0)-(b.pg.index||0))
-    .map(x=>({src:x.ii.thumburl||x.ii.url, page:x.ii.descriptionurl}));
+  const j=await q(CM,{action:'query',generator:'geosearch',ggscoord:`${lat}|${lon}`,ggsradius:radius,ggsnamespace:6,ggslimit:20,prop:'imageinfo',iiprop:'url|mime',iiurlwidth:900});
+  return Object.values(j?.query?.pages||{}).map(pg=>({pg,ii:pg.imageinfo?.[0]})).filter(x=>x.ii&&/jpeg|png|webp/.test(x.ii.mime||'')).sort((a,b)=>(a.pg.index||0)-(b.pg.index||0)).map(x=>({src:x.ii.thumburl||x.ii.url,page:x.ii.descriptionurl}));
 }
-const infoKey = p => `${p.lat.toFixed(4)},${p.lon.toFixed(4)}|${p.wiki}|${p.name}`;
-const pending = new Map(); const queue=[]; let running=0;
-function ensureInfo(p){
-  const k=infoKey(p);
-  if(INFO[k]) return Promise.resolve(INFO[k]);
-  if(pending.has(k)) return pending.get(k);
-  const pr = new Promise(res=>queue.push({p,k,res}));
-  pending.set(k,pr); pump(); return pr;
-}
+const infoKey=p=>`${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}|${p.wiki||''}|${p.name}`;
+const pending=new Map(),queue=[];let running=0;
+function ensureInfo(p){const k=infoKey(p);if(INFO[k])return Promise.resolve(INFO[k]);if(pending.has(k))return pending.get(k);const pr=new Promise(res=>queue.push({p,k,res}));pending.set(k,pr);pump();return pr}
 function pump(){
-  while(running<3 && queue.length){
-    const {p,k,res}=queue.shift(); running++;
+  while(running<3&&queue.length){
+    const{p,k,res}=queue.shift();running++;
     (async()=>{
-      let out={photos:[], extract:'', title:''};
+      let out={photos:[],extract:'',title:''},ok=false;
       try{
-        const [art, near] = await Promise.all([findArticle(p).catch(()=>null), commonsNear(p.lat,p.lon,120).catch(()=>[])]);
-        let photos = near;
-        if(photos.length<3){ photos = await commonsNear(p.lat,p.lon,400).catch(()=>near); }
-        const list=[];
-        if(art?.image) list.push({src:art.image, page:`https://en.wikipedia.org/wiki/${encodeURIComponent(art.title)}`});
+        const[art,near]=await Promise.all([findArticle(p).catch(()=>null),commonsNear(p.lat,p.lon,120).catch(()=>[])]);
+        let photos=near; if(photos.length<3) photos=await commonsNear(p.lat,p.lon,400).catch(()=>near);
+        const list=[];if(art?.image)list.push({src:art.image,page:`https://en.wikipedia.org/wiki/${encodeURIComponent(art.title)}`});
         const seen=new Set(list.map(x=>x.src.split('/').pop()));
-        for(const ph of photos){ const f=ph.src.split('/').pop(); if(!seen.has(f)){ seen.add(f); list.push(ph); } if(list.length>=8) break; }
-        out={photos:list, extract:art?.extract||'', title:art?.title||''};
-        INFO[k]=out; store(IKEY,INFO);
-      }catch(e){ /* offline: try again later */ }
-      pending.delete(k); running--; res(out); pump();
-      onInfo(p);
+        for(const ph of photos){const f=ph.src.split('/').pop();if(!seen.has(f)){seen.add(f);list.push(ph)}if(list.length>=8)break}
+        out={photos:list,extract:art?.extract||'',title:art?.title||''};INFO[k]=out;store('atlas.info.v1',INFO);ok=true;
+      }catch(e){}
+      pending.delete(k);running--;res(out);pump();if(ok)onInfo(p);
     })();
   }
 }
+const photoOf=p=>INFO[infoKey(p)]?.photos?.[0]?.src||'';
+function coverOf(t){for(const p of t.places){const s=photoOf(p);if(s)return s}return ''}
+let hubTimer=null;
 function onInfo(p){
-  const li=document.querySelector(`.item[data-id="${p.id}"] .thumb`);
-  const inf=INFO[infoKey(p)];
-  if(li && inf?.photos?.[0]){ li.style.backgroundImage=`url("${inf.photos[0].src}")`; li.firstChild && li.firstChild.nodeType===3 && (li.firstChild.textContent=''); }
+  const th=document.querySelector(`.item[data-id="${p.id}"] .thumb`);const src=photoOf(p);
+  if(th&&src){th.style.backgroundImage=`url("${src}")`;const f=th.firstChild;if(f&&f.nodeType===3)f.textContent=''}
   if(selected===p.id) renderDetail(p);
+  if(tab==='trips'){clearTimeout(hubTimer);hubTimer=setTimeout(renderHub,300)}
 }
 
-/* ---------- UI: header, chips, list ---------- */
-function renderHeader(){
-  const t=trip();
-  $('#tripName').textContent=t.name;
-  $('#tripSub').textContent=[t.dates, `${t.places.length} ${t.places.length===1?'place':'places'}`].filter(Boolean).join(' · ');
-  document.title = t.name + ' · Trip Atlas';
+/* ================= Trips hub ================= */
+function sortedTrips(){
+  const rank=t=>{const s=status(t);return s?.kind==='now'?0:s?.kind==='up'?1:s?2:1.5};
+  return [...S.trips].sort((a,b)=>rank(a)-rank(b)||(a.start||'9').localeCompare(b.start||'9'));
 }
-function renderChips(){
-  const t=trip(); const c=$('#chips');
-  if(filter!=='all' && !t.groups.some(g=>g.id===filter)) filter='all';
-  c.innerHTML = `<button class="chip" data-g="all" aria-pressed="${filter==='all'}">All</button>` +
-    t.groups.map(g=>`<button class="chip" data-g="${g.id}" aria-pressed="${filter===g.id}" style="--c:${g.color}"><i></i>${esc(g.name)}</button>`).join('');
+function tripCard(t){
+  const st=status(t),cv=coverOf(t);
+  return `<div class="tcard" data-open="${t.id}" role="button" tabindex="0">
+    <div class="cv" style="${cv?`background-image:url('${esc(cv)}')`:''}"></div>
+    <div class="meta"><b>${esc(t.name)}</b><span class="sub">${esc(fmtRange(t)||'No dates yet')}</span>
+      <span class="sub">${t.places.length} ${t.places.length===1?'place':'places'}${st?` · <span class="pill ${st.kind}">${st.label}</span>`:''}</span></div>
+    <button class="more" data-edit="${t.id}" aria-label="Trip settings">${ICON.more}</button></div>`;
+}
+function renderHub(){
+  const h=new Date().getHours();const first=(user?.name||'').split(' ')[0];
+  $('#greet').textContent=`Good ${h<12?'morning':h<18?'afternoon':'evening'}${first?', '+first:''}`;
+  $('#hubAvatar').textContent=(user?.name||user?.email||'?').trim()[0]?.toUpperCase()||'?';
+  const all=sortedTrips(); const past=all.filter(t=>status(t)?.kind==='past'); const act=all.filter(t=>status(t)?.kind!=='past');
+  const heroT=act[0]||past[0];
+  $('#greetSub').textContent=heroT?(status(heroT)?.kind==='now'?`You're on ${heroT.name} right now.`:'Here is what’s coming up.'):'Plan your first trip to get started.';
+  if(heroT){
+    const st=status(heroT),cv=coverOf(heroT),n=nights(heroT);
+    $('#heroSlot').innerHTML=`<button class="hero" data-open="${heroT.id}">
+      ${cv?`<div class="cover" style="background-image:url('${esc(cv)}')"></div>`:`<svg class="grat" viewBox="0 0 100 100" fill="none" stroke="#8FC7E3" stroke-width="1.2"><circle cx="50" cy="50" r="44"/><ellipse cx="50" cy="50" rx="22" ry="44"/><path d="M6 50h88M11 30h78M11 70h78"/></svg>`}
+      <div class="in">${st?`<span class="kicker">${st.label}</span>`:'<span class="kicker">Next up</span>'}
+        <h2>${esc(heroT.name)}</h2><div class="sub">${esc(fmtRange(heroT)||'Add dates in trip settings')}</div>
+        <div class="stats"><span><b>${heroT.places.length}</b>places</span><span><b>${heroT.groups.length}</b>groups</span>${n?`<span><b>${n}</b>${n===1?'day':'days'}</span>`:''}</div>
+      </div></button>`;
+    heroT.places.slice(0,4).forEach(ensureInfo);
+  } else $('#heroSlot').innerHTML='';
+  $('#tripCards').innerHTML=act.filter(t=>t!==heroT).map(tripCard).join('')||(heroT&&status(heroT)?.kind!=='past'?'':'<p class="hint">No upcoming trips.</p>');
+  $('#pastSec').hidden=!past.filter(t=>t!==heroT).length;
+  $('#pastCards').innerHTML=past.filter(t=>t!==heroT).map(tripCard).join('');
+  all.forEach(t=>t.places.slice(0,2).forEach(ensureInfo));
+}
+$('#view-trips').addEventListener('click',e=>{
+  const ed=e.target.closest('[data-edit]'); if(ed){e.stopPropagation();openTripForm(S.trips.find(t=>t.id===ed.dataset.edit));return}
+  const op=e.target.closest('[data-open]'); if(op){openTrip(op.dataset.open)}
+});
+function openTrip(id){S.current=id;save();filter='all';closeDetail();setTab('map');renderTripUI();fitAll(false)}
+
+/* ================= Map tab UI ================= */
+function renderTripUI(){
+  const t=trip();
+  if(!t){$('#tripName').textContent='No trip';$('#tripSub').textContent='';$('#chips').innerHTML='';renderMarkers();renderList();return}
+  $('#tripName').textContent=t.name;
+  $('#tripSub').textContent=[fmtRange(t),`${t.places.length} ${t.places.length===1?'place':'places'}`].filter(Boolean).join(' · ');
+  if(filter!=='all'&&!t.groups.some(g=>g.id===filter)) filter='all';
+  $('#chips').innerHTML=`<button class="chip glass" data-g="all" aria-pressed="${filter==='all'}">All</button>`+t.groups.map(g=>`<button class="chip glass" data-g="${g.id}" aria-pressed="${filter===g.id}" style="--c:${g.color}"><i></i>${esc(g.name)}</button>`).join('');
+  renderMarkers(); renderList();
 }
 function renderList(onlyDist){
-  const t=trip(), ul=$('#list');
-  const ps=visiblePlaces();
-  $('#sheetTitle').textContent = filter==='all' ? 'Places' : (t.groups.find(g=>g.id===filter)?.name||'Places');
-  $('#sheetCount').textContent = `${ps.length} ${ps.length===1?'place':'places'}${me?' · live distances':''}`;
-  if(onlyDist){ for(const p of ps){ const el=ul.querySelector(`.item[data-id="${p.id}"] .d`); if(el) el.textContent=dist(p) ? ' · '+dist(p) : ''; } return; }
-  if(!ps.length){ ul.innerHTML=`<li class="empty">No places yet. Tap + to search for one, or long-press on the map.</li>`; return; }
-  let html='', last=null;
+  const t=trip(),ul=$('#list'),ps=visiblePlaces();
+  $('#sheetTitle').textContent=filter==='all'?'Places':(t?.groups.find(g=>g.id===filter)?.name||'Places');
+  $('#sheetCount').textContent=`${ps.length} ${ps.length===1?'place':'places'}${me?' · live distance':''}`;
+  if(onlyDist){for(const p of ps){const el=ul.querySelector(`.item[data-id="${p.id}"] .d`);if(el)el.textContent=' · '+dist(p)}return}
+  if(!t){ul.innerHTML='<li class="empty">Create a trip in the Trips tab.</li>';return}
+  if(!ps.length){ul.innerHTML='<li class="empty">No places yet. Tap + to search for one, or press and hold on the map.</li>';return}
+  let html='',last=null;
   for(const p of ps){
     const g=groupOf(t,p);
-    if(filter==='all' && g.id!==last){ html+=`<li class="group-title">${esc(g.name)}</li>`; last=g.id; }
-    const inf=INFO[infoKey(p)]; const img=inf?.photos?.[0]?.src;
+    if(filter==='all'&&g.id!==last){html+=`<li class="group-title">${esc(g.name)}</li>`;last=g.id}
+    const img=photoOf(p);
     html+=`<li class="item" data-id="${p.id}" role="button" tabindex="0">
       <div class="thumb" style="--c:${g.color};${img?`background-image:url('${esc(img)}')`:''}">${img?'':esc(p.name.trim()[0]||'?')}<span class="n">${orderIndex(t,p)}</span></div>
-      <div class="meta"><b>${esc(p.name)}</b><span class="sub" style="--c:${g.color}"><i></i>${esc(g.name)}<span class="d">${me?' · '+dist(p):''}</span></span>${p.note?`<span class="note">${esc(p.note)}</span>`:''}</div>
-    </li>`;
+      <div class="meta"><b>${esc(p.name)}</b><span class="sub" style="--c:${g.color}"><i></i>${esc(g.name)}<span class="d">${me?' · '+dist(p):''}</span></span>${p.note?`<span class="note">${esc(p.note)}</span>`:''}</div></li>`;
   }
-  ul.innerHTML=html;
-  ps.forEach(p=>ensureInfo(p));
+  ul.innerHTML=html; ps.forEach(ensureInfo);
 }
-function renderAll(){ renderHeader(); renderChips(); renderMarkers(); renderList(); }
+$('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;filter=b.dataset.g;renderTripUI();fitAll()};
+$('#sheetHead').onclick=()=>document.body.classList.toggle('sheet-open');
+$('#list').onclick=e=>{const li=e.target.closest('.item');if(li)openDetail(li.dataset.id)};
+$('#list').onkeydown=e=>{const li=e.target.closest('.item');if(li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDetail(li.dataset.id)}};
+$('#fitBtn').onclick=()=>fitAll();
+$('#locBtn').onclick=startLocate;
+$('#addBtn').onclick=()=>{if(!trip()){toast('Create a trip first.');setTab('trips');return}openPlaceForm(null)};
+$('#tripHead').onclick=()=>{const t=trip();if(t)openTripForm(t);else openTripForm(null)};
 
-/* ---------- Detail ---------- */
+/* ================= Place card ================= */
 function openDetail(id){
-  const t=trip(); const p=t.places.find(x=>x.id===id); if(!p) return;
-  selected=id; renderMarkers(); renderDetail(p);
-  $('#detail').classList.add('show'); $('#detail').setAttribute('aria-hidden','false');
-  $('#detailScroll').scrollTop=0;
-  map.flyTo([p.lat - (map.getBounds().getNorth()-map.getBounds().getSouth())*0.28, p.lon], Math.max(map.getZoom(),15), {duration:.5});
+  const t=trip(),p=t?.places.find(x=>x.id===id);if(!p)return;
+  selected=id;renderMarkers();renderDetail(p);
+  $('#detail').classList.add('show');$('#detail').setAttribute('aria-hidden','false');$('#detailScroll').scrollTop=0;
+  map.easeTo({center:[p.lon,p.lat],zoom:Math.max(map.getZoom(),15),offset:[0,-innerHeight*0.3],duration:600});
   ensureInfo(p);
 }
-function closeDetail(){ $('#detail').classList.remove('show'); $('#detail').setAttribute('aria-hidden','true'); selected=null; renderMarkers(); }
+function closeDetail(){$('#detail').classList.remove('show');$('#detail').setAttribute('aria-hidden','true');if(selected){selected=null;renderMarkers()}}
 function renderDetail(p){
-  const t=trip(), g=groupOf(t,p), inf=INFO[infoKey(p)];
-  const photos = inf ? (inf.photos.length ? inf.photos.map(ph=>`<a href="${esc(ph.page)}" target="_blank" rel="noopener"><img src="${esc(ph.src)}" alt="${esc(p.name)}" loading="lazy"></a>`).join('') : `<div class="ph">No photos found nearby</div>`) : `<div class="ph">Loading photos…</div><div class="ph"></div>`;
-  const name=encodeURIComponent(p.name);
-  $('#detailScroll').innerHTML = `
-    <div class="photos">${photos}</div>
-    <div class="d-body">
+  const t=trip(),g=groupOf(t,p),inf=INFO[infoKey(p)],name=encodeURIComponent(p.name);
+  const photos=inf?(inf.photos.length?inf.photos.map(ph=>`<a href="${esc(ph.page)}" target="_blank" rel="noopener"><img src="${esc(ph.src)}" alt="${esc(p.name)}" loading="lazy"></a>`).join(''):`<div class="ph">No photos found nearby</div>`):`<div class="ph">Loading photos…</div>`;
+  $('#detailScroll').innerHTML=`
+    <div class="hero-photo"><div class="strip" id="strip">${photos}</div>${inf?.photos?.length>1?`<span class="count" id="phCount">1 / ${inf.photos.length}</span>`:''}</div>
+    <div class="d-body" style="--c:${g.color}">
       <h2>${esc(p.name)}</h2>
-      <div class="d-tags"><span class="tag" style="--c:${g.color}"><i></i>${esc(g.name)} · ${orderIndex(t,p)}</span>${me?`<span>${dist(p)} from you</span>`:''}</div>
+      <div class="d-tags"><span class="tag" style="--c:${g.color}"><i></i>${esc(g.name)} · #${orderIndex(t,p)}</span>${me?`<span>${dist(p)} away</span>`:''}</div>
       ${p.note?`<div class="note-box">${esc(p.note)}</div>`:''}
       ${inf?.extract?`<div class="extract">${esc(inf.extract)} <a href="https://en.wikipedia.org/wiki/${encodeURIComponent(inf.title)}" target="_blank" rel="noopener">Wikipedia</a></div>`:''}
       <div class="actions">
-        <a class="btn primary" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}&travelmode=transit" target="_blank" rel="noopener">Directions in Google Maps</a>
-        <a class="btn" href="https://maps.apple.com/?daddr=${p.lat},${p.lon}&q=${name}" target="_blank" rel="noopener">Directions in Apple Maps</a>
-        <a class="btn" href="https://www.google.com/maps/search/?api=1&query=${name}%20${p.lat},${p.lon}" target="_blank" rel="noopener">Google listing (hours)</a>
-        <button class="btn" id="dEdit">Edit</button>
+        <a class="btn primary wide" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}&travelmode=transit" target="_blank" rel="noopener">${ICON.nav}Directions in Google Maps</a>
+        <a class="btn" href="https://maps.apple.com/?daddr=${p.lat},${p.lon}&q=${name}" target="_blank" rel="noopener">${ICON.apple}Apple Maps</a>
+        <a class="btn" href="https://www.google.com/maps/search/?api=1&query=${name}%20${p.lat},${p.lon}" target="_blank" rel="noopener">${ICON.clock}Hours</a>
+        <button class="btn wide" id="dEdit">${ICON.edit}Edit place</button>
       </div>
-      <p class="credit">Photos: Wikipedia and Wikimedia Commons, taken near this spot. Tap a photo to see its source.</p>
+      <p class="credit">Photos from Wikipedia and Wikimedia Commons, taken near this spot. Tap a photo for its source.</p>
     </div>`;
   $('#dEdit').onclick=()=>openPlaceForm(p);
+  const strip=$('#strip'),cnt=$('#phCount');
+  if(strip&&cnt) strip.addEventListener('scroll',()=>{cnt.textContent=`${Math.round(strip.scrollLeft/strip.clientWidth)+1} / ${inf.photos.length}`},{passive:true});
 }
+$('#detailClose').onclick=closeDetail;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selected)closeDetail()});
 
-/* ---------- Place form ---------- */
-let editing=null, picked=null;
-function openPlaceForm(p, at){
-  const t=trip(); editing=p||null;
-  $('#pfTitle').textContent = p ? 'Edit place' : 'New place';
-  $('#pfGroup').innerHTML = t.groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('') || '<option value="">No group</option>';
-  $('#pfName').value=p?.name||''; $('#pfNote').value=p?.note||''; $('#pfWiki').value=p?.wiki||'';
-  $('#pfGroup').value = p?.group || (filter!=='all'?filter:(t.groups[t.groups.length-1]?.id||''));
-  $('#pfQ').value=''; $('#pfResults').innerHTML='';
-  picked = p ? {lat:p.lat, lon:p.lon} : (at||null);
-  showPicked();
-  $('#pfDel').hidden=!p; $('#pfUp').hidden=!p; $('#pfDel').dataset.arm='';
-  $('#pfDel').textContent='Delete';
-  $('#placeDlg').showModal();
-  if(!p && !at) setTimeout(()=>$('#pfQ').focus(),50);
+/* ================= Place form ================= */
+let editing=null,picked=null;
+function showPicked(){$('#pfPicked').textContent=picked?`Position: ${picked.lat.toFixed(5)}, ${picked.lon.toFixed(5)}`:'Pick a result, use the map center, or press and hold on the map.'}
+function openPlaceForm(p,at){
+  const t=trip();if(!t){toast('Create a trip first.');return}
+  editing=p||null;
+  $('#pfTitle').textContent=p?'Edit place':'New place';
+  $('#pfGroup').innerHTML=t.groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')||'<option value="">No group</option>';
+  $('#pfName').value=p?.name||'';$('#pfNote').value=p?.note||'';$('#pfWiki').value=p?.wiki||'';
+  $('#pfGroup').value=p?.group||(filter!=='all'?filter:(t.groups[t.groups.length-1]?.id||''));
+  $('#pfQ').value='';$('#pfResults').innerHTML='';
+  picked=p?{lat:p.lat,lon:p.lon}:(at||null);showPicked();
+  $('#pfDel').hidden=!p;$('#pfUp').hidden=!p;$('#pfDel').dataset.arm='';$('#pfDel').textContent='Delete';
+  $('#placeDlg').showModal(); if(!p&&!at) setTimeout(()=>$('#pfQ').focus(),60);
 }
-function showPicked(){ $('#pfPicked').textContent = picked ? `Position: ${picked.lat.toFixed(5)}, ${picked.lon.toFixed(5)}` : 'Pick a result, use the map center, or long-press on the map.'; }
 async function searchPlaces(){
-  const text=$('#pfQ').value.trim(); if(!text) return;
-  const ul=$('#pfResults'); ul.innerHTML='<li class="hint">Searching…</li>';
-  const b=map.getBounds();
-  const url='https://nominatim.openstreetmap.org/search?'+new URLSearchParams({format:'jsonv2', limit:6, q:text, 'accept-language':'en', viewbox:`${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}`});
+  const text=$('#pfQ').value.trim();if(!text)return;const ul=$('#pfResults');ul.innerHTML='<li class="hint">Searching…</li>';
+  const c=map.getCenter();
   try{
-    const res = await (await fetch(url)).json();
-    if(!res.length){ ul.innerHTML='<li class="hint">Nothing found. Try the English or local-language name.</li>'; return; }
-    ul.innerHTML = res.map((r,i)=>`<li><button type="button" data-i="${i}">${esc(r.name||r.display_name.split(',')[0])}<small>${esc(r.display_name)}</small></button></li>`).join('');
-    ul.querySelectorAll('button').forEach(btn=>btn.onclick=()=>{
-      const r=res[+btn.dataset.i];
-      picked={lat:+r.lat, lon:+r.lon}; showPicked();
-      if(!$('#pfName').value) $('#pfName').value = r.name || r.display_name.split(',')[0];
-      ul.innerHTML='';
-    });
-  }catch(e){ ul.innerHTML='<li class="hint">No connection to search right now.</li>'; }
+    const r=await(await fetch('https://photon.komoot.io/api/?'+new URLSearchParams({q:text,limit:6,lat:c.lat,lon:c.lng,lang:'en'}))).json();
+    const res=(r.features||[]).map(f=>{const pr=f.properties;return{name:pr.name||pr.street||text,sub:[pr.street&&pr.housenumber?pr.street+' '+pr.housenumber:pr.street,pr.city,pr.country].filter(Boolean).join(', '),lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0]}});
+    if(!res.length){ul.innerHTML='<li class="hint">Nothing found. Try the English or local name.</li>';return}
+    ul.innerHTML=res.map((x,i)=>`<li><button type="button" data-i="${i}">${esc(x.name)}<small>${esc(x.sub)}</small></button></li>`).join('');
+    ul.querySelectorAll('button').forEach(b=>b.onclick=()=>{const x=res[+b.dataset.i];picked={lat:x.lat,lon:x.lon};showPicked();if(!$('#pfName').value)$('#pfName').value=x.name;ul.innerHTML=''});
+  }catch(e){ul.innerHTML='<li class="hint">No connection to search right now.</li>'}
 }
 $('#pfSearch').onclick=searchPlaces;
-$('#pfQ').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); searchPlaces(); } });
-$('#pfCenter').onclick=()=>{ const c=map.getCenter(); picked={lat:c.lat, lon:c.lng}; showPicked(); };
-$('#pfHere').onclick=()=>{ if(me){ picked={lat:me.lat, lon:me.lon}; showPicked(); } else { startLocate(); toast('Turning on location; tap again in a few seconds.'); } };
+$('#pfQ').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchPlaces()}});
+$('#pfCenter').onclick=()=>{const c=map.getCenter();picked={lat:c.lat,lon:c.lng};showPicked()};
+$('#pfHere').onclick=()=>{if(me){picked={...me};showPicked()}else{startLocate();toast('Turning on location; tap again in a few seconds.')}};
 $('#placeForm').addEventListener('submit',e=>{
-  e.preventDefault();
-  const t=trip(); const name=$('#pfName').value.trim();
-  if(!name){ toast('Give the place a name.'); return; }
-  if(!picked){ toast('Choose a position: search, use the map center, or your location.'); return; }
-  const data={name, group:$('#pfGroup').value, note:$('#pfNote').value.trim(), wiki:$('#pfWiki').value.trim(), lat:picked.lat, lon:picked.lon};
-  let p;
-  if(editing){ Object.assign(editing,data); p=editing; }
-  else { p={id:uid(), ...data}; t.places.push(p); }
-  // keep list grouped: stable sort by group order
-  const order=t.groups.map(g=>g.id); t.places.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group));
-  save(); $('#placeDlg').close(); renderAll();
-  toast(editing?'Place updated':'Place added');
-  openDetail(p.id);
+  e.preventDefault();const t=trip(),name=$('#pfName').value.trim();
+  if(!name){toast('Give the place a name.');return}
+  if(!picked){toast('Choose a position: search, map center, or your location.');return}
+  const data={name,group:$('#pfGroup').value,note:$('#pfNote').value.trim(),wiki:$('#pfWiki').value.trim(),lat:picked.lat,lon:picked.lon};
+  let p;if(editing){Object.assign(editing,data);p=editing}else{p={id:uid(),...data};t.places.push(p)}
+  const order=t.groups.map(g=>g.id);t.places.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group));
+  touch(t);$('#placeDlg').close();renderTripUI();toast(editing?'Place updated':'Place added');openDetail(p.id);
 });
-$('#pfDel').onclick=()=>{
-  const b=$('#pfDel');
-  if(!b.dataset.arm){ b.dataset.arm='1'; b.textContent='Tap again to delete'; return; }
-  const t=trip(); t.places=t.places.filter(x=>x!==editing); save();
-  $('#placeDlg').close(); closeDetail(); renderAll(); toast('Place deleted');
-};
-$('#pfUp').onclick=()=>{
-  const t=trip(); const same=t.places.filter(x=>x.group===editing.group); const i=same.indexOf(editing);
-  if(i<=0){ toast('Already first in its group.'); return; }
-  const a=t.places.indexOf(same[i-1]), b=t.places.indexOf(editing);
-  [t.places[a],t.places[b]]=[t.places[b],t.places[a]]; save(); renderAll(); toast(`Now number ${i}`);
-};
-map.on('contextmenu',e=>{ openPlaceForm(null,{lat:e.latlng.lat, lon:e.latlng.lng}); });
+$('#pfDel').onclick=()=>{const b=$('#pfDel');if(!b.dataset.arm){b.dataset.arm='1';b.textContent='Tap again to delete';return}
+  const t=trip();t.places=t.places.filter(x=>x!==editing);touch(t);$('#placeDlg').close();closeDetail();renderTripUI();toast('Place deleted')};
+$('#pfUp').onclick=()=>{const t=trip(),same=t.places.filter(x=>x.group===editing.group),i=same.indexOf(editing);
+  if(i<=0){toast('Already first in its group.');return}
+  const a=t.places.indexOf(same[i-1]),b=t.places.indexOf(editing);[t.places[a],t.places[b]]=[t.places[b],t.places[a]];touch(t);renderTripUI();toast(`Now number ${i}`)};
 
-/* ---------- Trips dialog ---------- */
-function renderTripDlg(){
-  const t=trip();
-  $('#tripList').innerHTML = S.trips.map(x=>`<li><button data-id="${x.id}" aria-current="${x.id===t.id}"><b>${esc(x.name)}</b><span>${x.places.length} places</span></button></li>`).join('');
-  $('#tripList').querySelectorAll('button').forEach(b=>b.onclick=()=>{ S.current=b.dataset.id; save(); filter='all'; closeDetail(); renderAll(); renderTripDlg(); fitAll(); });
-  $('#tripRename').value=t.name;
-  $('#groupEd').innerHTML = t.groups.map((g,i)=>`<div class="g-row"><button class="swatch" data-i="${i}" style="--c:${g.color}" aria-label="Change color"></button><input type="text" id="g-${g.id}" data-i="${i}" value="${esc(g.name)}"><button class="x" data-del="${i}" aria-label="Remove group"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`).join('');
-  $('#groupEd').querySelectorAll('.swatch').forEach(b=>b.onclick=()=>{ const g=t.groups[+b.dataset.i]; g.color=PAL[(PAL.indexOf(g.color)+1)%PAL.length]; save(); renderTripDlg(); renderAll(); });
-  $('#groupEd').querySelectorAll('input').forEach(inp=>inp.onchange=()=>{ t.groups[+inp.dataset.i].name=inp.value.trim()||'Group'; save(); renderAll(); });
-  $('#groupEd').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
-    const g=t.groups[+b.dataset.del];
-    if(t.places.some(p=>p.group===g.id)){ toast('Move or delete the places in this group first.'); return; }
-    t.groups.splice(+b.dataset.del,1); save(); renderTripDlg(); renderAll();
-  });
-  $('#delTrip').dataset.arm=''; $('#delTrip').textContent='Delete trip';
+/* ================= Trip form ================= */
+let tEditing=null;
+function openTripForm(t){
+  tEditing=t||null;
+  $('#tfTitle').textContent=t?'Trip settings':'Plan a new trip';
+  $('#tfName').value=t?.name||'';$('#tfStart').value=t?.start||'';$('#tfEnd').value=t?.end||'';
+  $('#tfExisting').hidden=!t;$('#tfMore').hidden=!t;$('#tfSave').textContent=t?'Save':'Create trip';
+  $('#delTrip').dataset.arm='';$('#delTrip').textContent='Delete trip';
+  renderGroupEd();$('#tripDlg').showModal();if(!t)setTimeout(()=>$('#tfName').focus(),60);
 }
-$('#tripBtn').onclick=()=>{ renderTripDlg(); $('#tripDlg').showModal(); };
-$('#tripRename').onchange=()=>{ trip().name=$('#tripRename').value.trim()||'Trip'; save(); renderAll(); renderTripDlg(); };
-$('#addGroup').onclick=()=>{ const t=trip(); t.groups.push({id:uid(), name:`Day ${t.groups.length+1}`, color:PAL[t.groups.length%PAL.length]}); save(); renderTripDlg(); renderAll(); };
-$('#newTrip').onclick=()=>{ $('#newTripName').value=''; $('#nameDlg').showModal(); };
-$('#nameForm').addEventListener('submit',e=>{
-  e.preventDefault(); const n=$('#newTripName').value.trim(); if(!n) return;
-  const t={id:uid(), name:n, dates:'', groups:[{id:uid(), name:'Day 1', color:PAL[0]}], places:[]};
-  S.trips.push(t); S.current=t.id; save(); $('#nameDlg').close(); $('#tripDlg').close(); filter='all'; renderAll();
-  document.body.classList.add('sheet-open');
-  toast('Trip created. Tap + to add places.');
+function renderGroupEd(){
+  const t=tEditing;if(!t){$('#groupEd').innerHTML='';return}
+  $('#groupEd').innerHTML=t.groups.map((g,i)=>`<div class="g-row"><button type="button" class="swatch" data-i="${i}" style="--c:${g.color}" aria-label="Change color"></button><input type="text" id="g-${g.id}" data-i="${i}" value="${esc(g.name)}"><button type="button" class="x" data-del="${i}" aria-label="Remove group">${ICON.x}</button></div>`).join('');
+  $('#groupEd').querySelectorAll('.swatch').forEach(b=>b.onclick=()=>{const g=t.groups[+b.dataset.i];g.color=PAL[(PAL.indexOf(g.color)+1)%PAL.length];touch(t);renderGroupEd();renderTripUI()});
+  $('#groupEd').querySelectorAll('input').forEach(inp=>inp.onchange=()=>{t.groups[+inp.dataset.i].name=inp.value.trim()||'Group';touch(t);renderTripUI()});
+  $('#groupEd').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const g=t.groups[+b.dataset.del];if(t.places.some(p=>p.group===g.id)){toast('Move or delete the places in this group first.');return}t.groups.splice(+b.dataset.del,1);touch(t);renderGroupEd();renderTripUI()});
+}
+$('#addGroup').onclick=()=>{const t=tEditing;t.groups.push({id:uid(),name:`Day ${t.groups.length+1}`,color:PAL[t.groups.length%PAL.length]});touch(t);renderGroupEd();renderTripUI()};
+$('#tripForm').addEventListener('submit',e=>{
+  e.preventDefault();const name=$('#tfName').value.trim();if(!name){toast('Give the trip a name.');return}
+  let s=$('#tfStart').value,en=$('#tfEnd').value;if(s&&en&&en<s)[s,en]=[en,s];if(s&&!en)en=s;
+  if(tEditing){Object.assign(tEditing,{name,start:s,end:en});touch(tEditing);$('#tripDlg').close();renderAll();toast('Trip saved')}
+  else{const t=blankTrip(name,s,en);S.trips.push(t);S.current=t.id;touch(t);$('#tripDlg').close();renderAll();openTrip(t.id);document.body.classList.add('sheet-open');toast('Trip created. Tap + to add places.')}
 });
-$('#delTrip').onclick=()=>{
-  const b=$('#delTrip');
-  if(!b.dataset.arm){ b.dataset.arm='1'; b.textContent='Tap again to delete'; return; }
-  S.trips=S.trips.filter(x=>x.id!==S.current);
-  if(!S.trips.length){ const t={id:uid(), name:'New trip', dates:'', groups:[{id:uid(),name:'Day 1',color:PAL[0]}], places:[]}; S.trips.push(t); }
-  S.current=S.trips[0].id; save(); closeDetail(); renderAll(); renderTripDlg(); fitAll(); toast('Trip deleted');
-};
-$('#exportBtn').onclick=async()=>{
-  const t=trip(); const blob=new Blob([JSON.stringify({app:'trip-atlas', version:1, trip:t},null,1)],{type:'application/json'});
-  const fname=(t.name.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w]+/g,'-').toLowerCase()||'trip')+'.json';
+$('#delTrip').onclick=()=>{const b=$('#delTrip');if(!b.dataset.arm){b.dataset.arm='1';b.textContent='Tap again to delete';return}
+  const id=tEditing.id;S.trips=S.trips.filter(x=>x.id!==id);S.deleted.push(id);if(S.current===id)S.current=S.trips[0]?.id||null;save();pushDelete(id);
+  $('#tripDlg').close();closeDetail();setTab('trips');renderAll();toast('Trip deleted')};
+$('#exportTrip').onclick=()=>exportFile(tEditing?{app:'trip-atlas',version:2,trip:tEditing}:null,tEditing?.name);
+$('#newTripBtn').onclick=()=>openTripForm(null);
+$('#importBtn2').onclick=()=>$('#fileIn').click();
+
+/* ================= Import / export ================= */
+async function exportFile(obj,name){
+  const data=obj||{app:'trip-atlas',version:2,trips:S.trips};
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
+  const fname=((name||'trip-atlas-backup').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w]+/g,'-').toLowerCase())+'.json';
   const file=new File([blob],fname,{type:'application/json'});
-  if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file], title:t.name}); return; }catch(e){ if(e.name==='AbortError') return; } }
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); a.remove();
-};
-$('#importBtn').onclick=()=>$('#fileIn').click();
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name||'Trip Atlas backup'});return}catch(e){if(e.name==='AbortError')return}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();a.remove();
+}
 $('#fileIn').onchange=async()=>{
-  const f=$('#fileIn').files[0]; $('#fileIn').value=''; if(!f) return;
-  const text=await f.text();
+  const f=$('#fileIn').files[0];$('#fileIn').value='';if(!f)return;const text=await f.text();
   try{
-    let t;
-    if(/^\s*[\[{]/.test(text)){
-      const j=JSON.parse(text);
-      if(Array.isArray(j.trips)){ j.trips.forEach(x=>{ x.id=uid(); S.trips.push(x); }); t=S.trips[S.trips.length-1]; }
-      else { t=j.trip||j; t.id=uid(); S.trips.push(t); }
-    } else { t=parseKML(text, f.name.replace(/\.\w+$/,'')); S.trips.push(t); }
-    if(!t.places?.length) throw new Error('empty');
-    S.current=t.id; save(); filter='all'; $('#tripDlg').close(); renderAll(); fitAll();
-    toast(`Imported ${t.places.length} places`);
-  }catch(e){ toast('Could not read that file. Use a .kml from Google My Maps or a .json backup from this app.'); }
+    const added=[];
+    if(/^\s*[\[{]/.test(text)){const j=JSON.parse(text);const list=Array.isArray(j.trips)?j.trips:[j.trip||j];for(const x of list){const t=normTrip({...x,id:uid(),updated:Date.now()});S.trips.push(t);added.push(t)}}
+    else{const t=parseKML(text,f.name.replace(/\.\w+$/,''));S.trips.push(t);added.push(t)}
+    if(!added.length||!added.some(t=>t.places.length))throw new Error('empty');
+    added.forEach(touch);S.current=added[added.length-1].id;save();renderAll();toast(`Imported ${added.reduce((n,t)=>n+t.places.length,0)} places`);
+  }catch(e){toast('Could not read that file. Use a .kml from Google My Maps or a .json backup from this app.')}
 };
-function parseKML(text, fallback){
-  const doc=new DOMParser().parseFromString(text,'application/xml');
-  if(doc.getElementsByTagName('parsererror').length) throw new Error('xml');
-  const kid=(el,name)=>[...el.children].find(c=>c.localName===name);
+function parseKML(text,fallback){
+  const doc=new DOMParser().parseFromString(text,'application/xml');if(doc.getElementsByTagName('parsererror').length)throw new Error('xml');
+  const kid=(el,n)=>[...el.children].find(c=>c.localName===n);
   const docEl=doc.getElementsByTagName('Document')[0]||doc.documentElement;
-  const tname=kid(docEl,'name')?.textContent.trim()||fallback||'Imported trip';
-  const groups=[], places=[];
-  const plain=h=>{ if(!h) return ''; const d=new DOMParser().parseFromString(h,'text/html'); return (d.body.textContent||'').trim(); };
-  const takePlacemarks=(container, gid)=>{
-    for(const pm of container.getElementsByTagName('Placemark')){
-      let up=pm.parentElement; while(up && up.localName!=='Folder' && up!==container) up=up.parentElement;
-      if(container.localName==='Folder' && up!==container) continue;
-      if(!pm.getElementsByTagName('Point').length) continue;
-      const c=(pm.getElementsByTagName('coordinates')[0]?.textContent||'').trim().split(/[\s,]+/);
-      const lon=parseFloat(c[0]), lat=parseFloat(c[1]); if(!isFinite(lat)||!isFinite(lon)) continue;
-      places.push({id:uid(), name:kid(pm,'name')?.textContent.trim()||'Place', lat, lon, note:plain(kid(pm,'description')?.textContent), wiki:'', group:gid});
-    }
-  };
+  const groups=[],places=[];const plain=h=>h?(new DOMParser().parseFromString(h,'text/html').body.textContent||'').trim():'';
+  const take=(c,gid)=>{for(const pm of c.getElementsByTagName('Placemark')){let up=pm.parentElement;while(up&&up.localName!=='Folder'&&up!==c)up=up.parentElement;if(c.localName==='Folder'&&up!==c)continue;if(!pm.getElementsByTagName('Point').length)continue;
+    const co=(pm.getElementsByTagName('coordinates')[0]?.textContent||'').trim().split(/[\s,]+/),lon=parseFloat(co[0]),lat=parseFloat(co[1]);if(!isFinite(lat)||!isFinite(lon))continue;
+    places.push({id:uid(),name:kid(pm,'name')?.textContent.trim()||'Place',lat,lon,note:plain(kid(pm,'description')?.textContent),wiki:'',group:gid})}};
   const folders=[...doc.getElementsByTagName('Folder')];
-  if(folders.length){
-    folders.forEach((fo,i)=>{ const g={id:uid(), name:kid(fo,'name')?.textContent.trim()||`Group ${i+1}`, color:PAL[i%PAL.length]}; groups.push(g); takePlacemarks(fo,g.id); });
-  } else { const g={id:uid(), name:'Places', color:PAL[0]}; groups.push(g); takePlacemarks(docEl,g.id); }
-  return {id:uid(), name:tname, dates:'', groups, places};
+  if(folders.length)folders.forEach((fo,i)=>{const g={id:uid(),name:kid(fo,'name')?.textContent.trim()||`Group ${i+1}`,color:PAL[i%PAL.length]};groups.push(g);take(fo,g.id)});
+  else{const g={id:uid(),name:'Places',color:PAL[0]};groups.push(g);take(docEl,g.id)}
+  return normTrip({id:uid(),name:kid(docEl,'name')?.textContent.trim()||fallback||'Imported trip',start:'',end:'',groups,places});
 }
 
-/* ---------- Misc wiring ---------- */
-let tt; function toast(m){ const el=$('#toast'); el.textContent=m; el.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('show'),3200); }
-document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
-document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{ if(e.target===d) d.close(); }));
-$('#chips').onclick=e=>{ const b=e.target.closest('.chip'); if(!b) return; filter=b.dataset.g; renderChips(); renderMarkers(); renderList(); fitAll(); };
-$('#sheetHead').onclick=()=>{ document.body.classList.toggle('sheet-open'); setTimeout(()=>map.invalidateSize(),260); };
-$('#list').onclick=e=>{ const li=e.target.closest('.item'); if(li) openDetail(li.dataset.id); };
-$('#list').onkeydown=e=>{ const li=e.target.closest('.item'); if(li && (e.key==='Enter'||e.key===' ')){ e.preventDefault(); openDetail(li.dataset.id); } };
-$('#detailClose').onclick=closeDetail;
-$('#fitBtn').onclick=fitAll;
-$('#locBtn').onclick=startLocate;
-$('#addBtn').onclick=()=>openPlaceForm(null);
-document.addEventListener('keydown',e=>{ if(e.key==='Escape' && selected) closeDetail(); });
+/* ================= Cloud sync (Supabase) ================= */
+let sync={state:sb?'idle':'off',at:null,msg:''};
+const pushTimers=new Map();
+function setSync(state,msg){sync={state,at:state==='ok'?new Date():sync.at,msg:msg||''};if(tab==='account')renderAccount()}
+function schedulePush(t){if(!sb||!user)return;clearTimeout(pushTimers.get(t.id));pushTimers.set(t.id,setTimeout(()=>pushTrip(t),1200))}
+async function pushTrip(t){
+  if(!sb||!user)return;setSync('busy');
+  const{error}=await sb.from('trips').upsert({id:t.id,user_id:user.id,data:t,updated_at:new Date(t.updated).toISOString(),deleted:false});
+  error?setSync('err',error.message):setSync('ok');
+}
+async function pushDelete(id){
+  if(!sb||!user)return;const{error}=await sb.from('trips').upsert({id,user_id:user.id,data:{},updated_at:new Date().toISOString(),deleted:true});
+  if(!error)S.deleted=S.deleted.filter(x=>x!==id),save();
+}
+async function pull(){
+  if(!sb||!user)return;setSync('busy');
+  const{data,error}=await sb.from('trips').select('id,data,updated_at,deleted');
+  if(error){setSync('err',error.message);return}
+  const remote=new Map(data.map(r=>[r.id,r]));
+  for(const r of data){
+    const i=S.trips.findIndex(t=>t.id===r.id);
+    if(r.deleted){if(i>=0)S.trips.splice(i,1);continue}
+    const rt=normTrip(r.data);
+    if(i<0){if(!S.deleted.includes(r.id))S.trips.push(rt)}else if((rt.updated||0)>(S.trips[i].updated||0))S.trips[i]=rt;
+  }
+  const ups=S.trips.filter(t=>{const r=remote.get(t.id);return !r||(!r.deleted&&(t.updated||0)>(r.data?.updated||0))});
+  for(const id of [...S.deleted])await pushDelete(id);
+  if(ups.length){const{error:e2}=await sb.from('trips').upsert(ups.map(t=>({id:t.id,user_id:user.id,data:t,updated_at:new Date(t.updated).toISOString(),deleted:false})));if(e2){setSync('err',e2.message);return}}
+  if(!S.trips.find(t=>t.id===S.current))S.current=S.trips[0]?.id||null;
+  save();setSync('ok');renderAll();
+}
+async function onSignedIn(sessionUser){
+  const u={id:sessionUser.id,email:sessionUser.email,name:sessionUser.user_metadata?.name||''};
+  const first=!load(keyFor(u));
+  const guest=load(keyFor(null));
+  user=u;loadState();
+  if(first&&guest?.trips?.length&&!S.trips.length){S.trips=guest.trips.map(normTrip);S.current=guest.current;save()}
+  renderAll();await pull();
+}
+function onSignedOut(){user=null;loadState();renderAll()}
 
-renderAll(); fitAll();
+/* ================= Account tab ================= */
+let authStep='email',authEmail='',authName='',authErr='',authBusy=false;
+const syncLine=()=>{const m={off:['','Cloud sync is not set up'],idle:['','Not synced yet'],busy:['busy','Syncing…'],ok:['ok',`Synced ${sync.at?sync.at.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):''}`],err:['err','Sync failed: '+sync.msg]}[sync.state];return`<div class="sync ${m[0]}"><i></i>${esc(m[1])}</div>`};
+function renderAccount(){
+  const w=$('#accountWrap');const initials=(user?.name||user?.email||'?').trim()[0]?.toUpperCase()||'?';
+  let html=`<div class="brand"><img src="logo.svg" alt=""><b>Account</b></div>`;
+  if(!sb){
+    html+=`<div class="card"><h3>Accounts are almost ready</h3><p>To sign in and sync trips between devices, connect a free Supabase project:</p>
+      <ol class="steps"><li>Create a project at supabase.com.</li><li>Run <code>setup.sql</code> in its SQL editor.</li><li>Put the project URL and anon key in <code>config.js</code>.</li></ol>
+      <p>Until then, trips are saved on this device.</p></div>`;
+  } else if(!user){
+    html+=`<div class="card"><h3>${authStep==='email'?'Sign in or create an account':'Check your email'}</h3>
+      ${authStep==='email'?`<p>We'll email you a 6-digit code. No password needed.</p>
+        <form id="authForm" class="wrap" style="gap:12px">
+          <label class="f">Name<input type="text" id="aName" autocomplete="name" value="${esc(authName)}" placeholder="Your name"></label>
+          <label class="f">Email<input type="email" id="aEmail" autocomplete="email" required value="${esc(authEmail)}" placeholder="you@example.com"></label>
+          ${authErr?`<p class="err-msg">${esc(authErr)}</p>`:''}
+          <button class="btn primary" ${authBusy?'disabled':''}>${authBusy?'Sending…':'Send code'}</button></form>`
+      :`<p>We sent a 6-digit code to <b>${esc(authEmail)}</b>. Type it below.</p>
+        <form id="codeForm" class="wrap" style="gap:12px">
+          <input class="code" type="text" id="aCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
+          ${authErr?`<p class="err-msg">${esc(authErr)}</p>`:''}
+          <button class="btn primary" ${authBusy?'disabled':''}>${authBusy?'Checking…':'Sign in'}</button>
+          <button type="button" class="btn" id="aBack">Use a different email</button></form>`}
+      </div>
+      <div class="card"><p>Without an account, your trips stay on this device. When you sign in, they move into your account and sync everywhere.</p></div>`;
+  } else {
+    html+=`<div class="card"><div class="profile"><span class="avatar">${esc(initials)}</span><div style="min-width:0"><b>${esc(user.name||'Traveller')}</b><span>${esc(user.email)}</span></div></div>
+      ${syncLine()}
+      <label class="f">Display name<input type="text" id="aRename" value="${esc(user.name)}" placeholder="Your name"></label>
+      <div class="grid-btns"><button class="btn" id="aSync">Sync now</button><button class="btn danger" id="aOut">Sign out</button></div></div>`;
+  }
+  const ms=S.prefs.mapStyle||'auto';
+  html+=`<div class="card"><h3>Map style</h3><div class="seg" id="styleSeg">${[['auto','Auto'],['liberty','Liberty'],['bright','Bright'],['positron','Light'],['dark','Dark']].map(([k,l])=>`<button data-s="${k}" aria-pressed="${ms===k}">${l}</button>`).join('')}</div><p class="hint">Auto follows your phone's light or dark mode.</p></div>
+    <div class="card"><h3>Backup</h3><p>Export all trips as a file, or import a backup or a Google My Maps .kml.</p>
+      <div class="grid-btns"><button class="btn" id="aExport">Export all</button><button class="btn" id="aImport">Import</button></div></div>`;
+  w.innerHTML=html;
+  $('#authForm')?.addEventListener('submit',sendCode);
+  $('#codeForm')?.addEventListener('submit',verifyCode);
+  $('#aBack')&&($('#aBack').onclick=()=>{authStep='email';authErr='';renderAccount()});
+  $('#aOut')&&($('#aOut').onclick=async()=>{await sb.auth.signOut();toast('Signed out')});
+  $('#aSync')&&($('#aSync').onclick=pull);
+  $('#aRename')&&($('#aRename').onchange=async e=>{const n=e.target.value.trim();const{error}=await sb.auth.updateUser({data:{name:n}});if(!error){user.name=n;toast('Name saved');renderHub()}});
+  $('#styleSeg').onclick=e=>{const b=e.target.closest('[data-s]');if(!b)return;S.prefs.mapStyle=b.dataset.s;save();applyStyle();renderAccount()};
+  $('#aExport').onclick=()=>exportFile(null,'trip-atlas-backup');
+  $('#aImport').onclick=()=>$('#fileIn').click();
+}
+async function sendCode(e){
+  e.preventDefault();authName=$('#aName').value.trim();authEmail=$('#aEmail').value.trim();authErr='';authBusy=true;renderAccount();
+  const{error}=await sb.auth.signInWithOtp({email:authEmail,options:{shouldCreateUser:true,data:{name:authName}}});
+  authBusy=false;if(error){authErr=error.message;renderAccount();return}
+  authStep='code';renderAccount();setTimeout(()=>$('#aCode')?.focus(),60);
+}
+async function verifyCode(e){
+  e.preventDefault();const token=$('#aCode').value.replace(/\D/g,'');if(token.length<6){authErr='Enter the 6-digit code.';renderAccount();return}
+  authBusy=true;authErr='';renderAccount();
+  const{data,error}=await sb.auth.verifyOtp({email:authEmail,token,type:'email'});
+  authBusy=false;if(error){authErr='That code did not work. Check it or send a new one.';renderAccount();return}
+  if(authName&&data?.user&&!data.user.user_metadata?.name) await sb.auth.updateUser({data:{name:authName}});
+  authStep='email';toast('Signed in');
+}
+
+/* ================= Tabs & boot ================= */
+function setTab(t){
+  tab=t;document.body.dataset.tab=t;
+  document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
+  if(t!=='map')closeDetail();
+  if(t==='trips')renderHub();if(t==='account')renderAccount();
+  if(t==='map'){map.resize();renderTripUI()}
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='map'&&tab==='map'){fitAll();return}setTab(b.dataset.tab)});
+$('#hubAvatar').onclick=()=>setTab('account');
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
+document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+function renderAll(){renderHub();renderTripUI();if(tab==='account')renderAccount()}
+
+loadState();initMap();renderAll();
+map.once('load',()=>fitAll(false));
+if(sb){
+  sb.auth.onAuthStateChange((ev,session)=>{
+    if(session?.user&&(!user||user.id!==session.user.id)) setTimeout(()=>onSignedIn(session.user),0);
+    else if(!session&&user) setTimeout(onSignedOut,0);
+    else if(session?.user&&user) user.name=session.user.user_metadata?.name||user.name;
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&user)pull()});
+}
 </script>
 </body>
 </html>
