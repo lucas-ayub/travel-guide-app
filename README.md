@@ -4,6 +4,8 @@ A travel map app for iPhone. Your trips are the home screen; each trip's places 
 
 Live: https://lucas-ayub.github.io/travel-guide-app/
 
+> **Vibe-coded.** This app was built by describing it in plain language to Claude, Anthropic's AI assistant, which wrote the code, SQL, logo and setup steps. The author tested it on his iPhone and steered it with feedback, but did not write the code by hand. Expect rough edges, and review the code before reusing it. The prompts used to build it are in [PROMPTS.md](PROMPTS.md).
+
 ## Install on iPhone
 
 Open the link in Safari, tap Share → Add to Home Screen, then always open Trip Atlas from its icon. The home screen app and Safari keep separate sign-ins.
@@ -37,6 +39,7 @@ After an update, close the app completely and open it again. GitHub Pages can ta
 - `setup.sql` – run once in Supabase → SQL Editor to create the trips table
 - `sharing.sql` – run once after `setup.sql` to enable sharing
 - `manifest.webmanifest`, `icon.png`, `icon-512.png`, `logo.svg` – home screen app name, colours and icons
+- `PROMPTS.md` – the prompts used to vibe-code the app, translated into English
 
 ## Notes
 
