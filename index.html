@@ -91,6 +91,22 @@ body.sheet-open .fabs{bottom:calc(var(--tabh) + 50vh + 12px - var(--gap,0px))}
 body.sheet-open .sheet{height:50vh}
 .sheet-head{border:0;background:none;padding:8px 18px 10px;text-align:left;display:flex;flex-direction:column;gap:6px;width:100%}
 .grab{width:40px;height:5px;border-radius:3px;background:var(--line);align-self:center}
+/* search the trip's places: shown when the list is open; while searching the list grows to the top */
+.sheet-search{display:flex;gap:6px;align-items:center;padding:0 14px 8px;position:relative}
+body:not(.sheet-open) .sheet-search{display:none}
+.sheet-search .ic{position:absolute;left:13px;top:13px;width:18px;height:18px;color:var(--muted);pointer-events:none}
+#placeQ{-webkit-appearance:none;appearance:none;flex:1;min-width:0;min-height:44px;padding:10px 38px 10px 40px;background:var(--surface-2);border-color:transparent;border-radius:13px}
+#placeQ::-webkit-search-cancel-button{display:none}
+#placeQ:focus-visible{outline:none;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 70%,transparent)}
+.sheet-search .clr{position:absolute;right:0;top:0;width:44px;height:44px;border:0;background:none;display:grid;place-items:center;color:var(--muted)}
+.sheet-search .clr span{width:20px;height:20px;border-radius:50%;background:color-mix(in srgb,var(--muted) 45%,transparent);color:var(--surface);display:grid;place-items:center}
+.sheet-search .clr svg{width:10px;height:10px}
+.sheet-search .field{position:relative;flex:1;min-width:0;display:flex}
+.sheet-search .cancel{display:none;border:0;background:none;color:var(--accent);font-weight:700;padding:8px 4px}
+body.searching .sheet-search .cancel{display:block}
+body.searching .sheet{top:calc(var(--st) + 66px);height:auto}
+body.searching .chips{visibility:hidden}
+.meta b mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;border-radius:3px}
 .sheet-head .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .sheet-head b{font:700 18px/1.2 var(--display)}
 .sheet-head span{font-size:13px;color:var(--muted)}
@@ -313,6 +329,9 @@ textarea{min-height:84px;resize:vertical}
         <span class="txt"><div class="t" id="tripName">Trip</div><div class="s" id="tripSub"></div></span>
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>
       </button>
+      <button class="sq glass" id="searchBtn" aria-label="Search places">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      </button>
       <button class="sq glass" id="fitBtn" aria-label="Show all places">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
       </button>
@@ -332,6 +351,14 @@ textarea{min-height:84px;resize:vertical}
       <span class="grab"></span>
       <span class="row"><b id="sheetTitle">Places</b><span id="sheetCount"></span></span>
     </button>
+    <div class="sheet-search" role="search">
+      <div class="field">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+        <input type="search" id="placeQ" placeholder="Search places in this trip" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="Search places in this trip">
+        <button type="button" class="clr" id="placeQx" aria-label="Clear search" hidden><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button>
+      </div>
+      <button type="button" class="cancel" id="placeQcancel">Cancel</button>
+    </div>
     <ul class="list" id="list"></ul>
   </section>
 </div>
@@ -520,7 +547,7 @@ function blankTrip(name,start,end){return{id:uid(),name,start:start||'',end:end|
 
 /* ================= State ================= */
 const CFG=window.ATLAS_CONFIG||{};
-const BUILD='1 Oct 2026, 01:54';
+const BUILD='9 Oct 2026, 22:05';
 const HAS_AUTH=!!(CFG.supabaseUrl&&CFG.supabaseAnonKey);
 /* Where the sign-in lives. "Keep me signed in" on: localStorage, which survives closing the app.
    Off: sessionStorage, which the phone clears when the app is closed. */
@@ -627,7 +654,23 @@ function applyStyle(){const n=styleName();if(map&&n!==currentStyle){currentStyle
 darkMq.addEventListener?.('change',applyStyle);
 
 const markers=new Map();
+// Search: every word must appear in the name, notes, group or Wikipedia title; accents and case are ignored.
+let query='';
+const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/ø/g,'o').replace(/æ/g,'ae').replace(/œ/g,'oe').replace(/ß/g,'ss').replace(/[łđ]/g,c=>c==='ł'?'l':'d');
+const qWords=()=>fold(query).split(/\s+/).filter(Boolean);
+function matches(t,p,ws){const hay=fold([p.name,p.note,p.wiki,groupOf(t,p).name].join(' '));return ws.every(w=>hay.includes(w))}
+function markMatch(name){
+  const ws=qWords();if(!ws.length)return esc(name);
+  const f=fold(name),on=new Array(name.length).fill(false);
+  // fold() keeps one character per character for Latin text; skip highlighting if it doesn't
+  if(f.length!==name.length)return esc(name);
+  for(const w of ws){let i=f.indexOf(w);while(i>=0){for(let k=i;k<i+w.length;k++)on[k]=true;i=f.indexOf(w,i+w.length)}}
+  let out='',open=false;
+  for(let i=0;i<name.length;i++){if(on[i]!==open){out+=on[i]?'<mark>':'</mark>';open=on[i]}out+=esc(name[i])}
+  return out+(open?'</mark>':'');
+}
 function visiblePlaces(){const t=trip();if(!t)return[];
+  if(qWords().length){const ws=qWords();return t.places.filter(p=>matches(t,p,ws))}   // all places, visited too
   if(filter==='visited')return t.places.filter(p=>p.visited);
   return t.places.filter(p=>!p.visited&&(filter==='all'||p.group===filter))}
 const fmtWhen=ts=>new Date(ts).toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -925,7 +968,7 @@ $('#view-trips').addEventListener('click',e=>{
   const ed=e.target.closest('[data-edit]'); if(ed){e.stopPropagation();openTripForm(S.trips.find(t=>t.id===ed.dataset.edit));return}
   const op=e.target.closest('[data-open]'); if(op){openTrip(op.dataset.open)}
 });
-function openTrip(id){S.current=id;save();filter='all';closeDetail();setTab('map');renderTripUI();fitAll(false)}
+function openTrip(id){S.current=id;save();filter='all';endSearch(true);closeDetail();setTab('map');renderTripUI();fitAll(false)}
 
 /* ================= Map tab UI ================= */
 function renderTripUI(){
@@ -940,31 +983,56 @@ function renderTripUI(){
   renderMarkers(); renderList();
 }
 function renderList(onlyDist){
-  const t=trip(),ul=$('#list'),ps=visiblePlaces(),vis=filter==='visited';
-  const done=t&&!vis?t.places.filter(p=>p.visited&&(filter==='all'||p.group===filter)).length:0;   // visited here, now listed under Visited
-  $('#sheetTitle').textContent=vis?'Already visited':filter==='all'?'Places':(t?.groups.find(g=>g.id===filter)?.name||'Places');
-  $('#sheetCount').textContent=`${ps.length} ${ps.length===1?'place':'places'}${done?` · ${done} visited`:''}${me?' · live distance':''}`;
+  const t=trip(),ul=$('#list'),ps=visiblePlaces(),vis=filter==='visited',srch=qWords().length>0;
+  if(srch&&t){
+    $('#sheetTitle').textContent='Search';
+    $('#sheetCount').textContent=`${ps.length} ${ps.length===1?'result':'results'}${me?' · live distance':''}`;
+  }
+  const done=t&&!vis&&!srch?t.places.filter(p=>p.visited&&(filter==='all'||p.group===filter)).length:0;   // visited here, now listed under Visited
+  if(!srch){$('#sheetTitle').textContent=vis?'Already visited':filter==='all'?'Places':(t?.groups.find(g=>g.id===filter)?.name||'Places');
+  $('#sheetCount').textContent=`${ps.length} ${ps.length===1?'place':'places'}${done?` · ${done} visited`:''}${me?' · live distance':''}`}
   if(onlyDist){for(const p of ps){const el=ul.querySelector(`.item[data-id="${p.id}"] .d`);if(el)el.textContent=' · '+dist(p)}return}
   if(!t){ul.innerHTML='<li class="empty">Create a trip in the Trips tab.</li>';return}
+  if(!ps.length&&srch){ul.innerHTML=`<li class="empty">No places match “${esc(query.trim())}”.</li>`;return}
   if(!ps.length){ul.innerHTML=done?'<li class="empty">You’ve visited every place here. Find them under Visited.</li>':'<li class="empty">No places yet. Tap + to search for one, or press and hold on the map.</li>';return}
   let html='',last=null;const edit=canEdit(t);
   for(const p of ps){
     const g=groupOf(t,p);
-    if((filter==='all'||vis)&&g.id!==last){html+=`<li class="group-title">${esc(g.name)}</li>`;last=g.id}
+    if((filter==='all'||vis||srch)&&g.id!==last){html+=`<li class="group-title">${esc(g.name)}</li>`;last=g.id}
     const img=photoOf(p);
     html+=`<li class="item" data-id="${p.id}" role="button" tabindex="0">
       <div class="thumb" style="--c:${g.color};${img?`background-image:url('${esc(img)}')`:''}">${img?'':esc(p.name.trim()[0]||'?')}<span class="n">${orderIndex(t,p)}</span></div>
-      <div class="meta"><b>${esc(p.name)}</b><span class="sub" style="--c:${g.color}"><i></i>${esc(g.name)}<span class="d">${me?' · '+dist(p):''}</span></span>${p.note?`<span class="note">${esc(p.note)}</span>`:''}</div>${edit?`<button class="tick${p.visited?' on':''}" data-visit="${p.id}" aria-label="${p.visited?'Mark as not visited':'Mark as visited'}"><span>${ICON.check}</span></button>`:''}</li>`;
+      <div class="meta"><b>${srch?markMatch(p.name):esc(p.name)}</b><span class="sub" style="--c:${g.color}"><i></i>${esc(g.name)}<span class="d">${me?' · '+dist(p):''}</span></span>${p.note?`<span class="note">${esc(p.note)}</span>`:''}</div>${edit?`<button class="tick${p.visited?' on':''}" data-visit="${p.id}" aria-label="${p.visited?'Mark as not visited':'Mark as visited'}"><span>${ICON.check}</span></button>`:''}</li>`;
   }
   ul.innerHTML=html; ps.forEach(ensureInfo);
 }
-$('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;filter=b.dataset.g;$('#list').scrollTop=0;renderTripUI();fitAll()};
-$('#sheetHead').onclick=()=>document.body.classList.toggle('sheet-open');
+$('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;filter=b.dataset.g;$('#list').scrollTop=0;if(query)endSearch(true);renderTripUI();fitAll()};
+$('#sheetHead').onclick=()=>{const open=document.body.classList.toggle('sheet-open');if(!open)endSearch()};
+function setQuery(v){
+  query=v;$('#placeQx').hidden=!v;$('#list').scrollTop=0;
+  document.body.classList.toggle('searching',!!v||document.activeElement===$('#placeQ'));
+  renderMarkers();renderList();
+}
+function endSearch(quiet){
+  $('#placeQ').value='';$('#placeQ').blur();document.body.classList.remove('searching');
+  if(query||!quiet){query='';$('#placeQx').hidden=true;if(!quiet){renderMarkers();renderList()}}
+}
+$('#placeQ').addEventListener('input',e=>setQuery(e.target.value));
+$('#placeQ').addEventListener('focus',()=>document.body.classList.add('sheet-open','searching'));
+$('#placeQ').addEventListener('blur',()=>{if(!query.trim())document.body.classList.remove('searching')});
+$('#placeQ').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();const ps=visiblePlaces();if(qWords().length&&ps.length===1){$('#placeQ').blur();openDetail(ps[0].id)}else $('#placeQ').blur()}
+  if(e.key==='Escape')endSearch()});
+$('#placeQx').onclick=()=>{$('#placeQ').value='';setQuery('');$('#placeQ').focus()};
+$('#placeQcancel').onclick=()=>endSearch();
+$('#searchBtn').onclick=()=>{document.body.classList.add('sheet-open','searching');$('#placeQ').focus()};
 $('#list').onclick=e=>{
   const li=e.target.closest('.item'),tk=e.target.closest('[data-visit]');
   if(tk){const p=trip()?.places.find(x=>x.id===tk.dataset.visit);if(!p||li?.classList.contains('leaving'))return;
-    tk.classList.toggle('on',!p.visited);li?.classList.add('leaving');setTimeout(()=>setVisited(p,!p.visited),230);return}
-  if(li)openDetail(li.dataset.id)};
+    tk.classList.toggle('on',!p.visited);
+    if(qWords().length){setVisited(p,!p.visited);return}
+    li?.classList.add('leaving');setTimeout(()=>setVisited(p,!p.visited),230);return}
+  if(li){$('#placeQ').blur();openDetail(li.dataset.id)}};
 $('#list').onkeydown=e=>{if(e.target.closest('[data-visit]'))return;const li=e.target.closest('.item');if(li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDetail(li.dataset.id)}};
 $('#fitBtn').onclick=()=>fitAll();
 $('#locBtn').onclick=startLocate;
