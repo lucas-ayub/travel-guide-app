@@ -252,3 +252,9 @@ Added a magnifier at the top of the Map tab and a search field at the top of the
 
 **Claude**
 Added this section with the last three changes and will keep the file up to date with each new feature.
+
+**Prompt**
+> When I open the live link on GitHub without signing in, the trip that shows up is my own Copenhagen one. I want the default trips to be generic ones, say Paris and Rio de Janeiro, with titles that make clear they're demo trips showing how the app works. Also make it clear that the app works in a browser and not only as an iOS app, and optimise it for Android browsers too.
+
+**Claude**
+Replaced the built-in trip with two demo trips, *Demo trip · Paris* (3 days, 20 places) and *Demo trip · Rio de Janeiro* (4 days, 21 places), dated a few weeks ahead so the countdown shows. A note on the Trips tab explains what they are, with *Plan your own trip* and *Remove demos*; demo trips never join an account. Devices that still had the old built-in trip get the demos instead, keeping any trips of their own. For Android and other browsers: an "Any device, any browser" card in the Account tab with an *Install Trip Atlas* button where Chrome offers one, separate 192 px, 512 px and maskable icons, a pass-through service worker so Chrome can offer installing, the back button closing the top layer instead of leaving the app, panels sized to the visible screen under Chrome's address bar, no pull-to-refresh while dragging, location help for Android, and the iPhone bottom-edge fix limited to iPhone. Tested in Pixel 7 and iPhone emulation.

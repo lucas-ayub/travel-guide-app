@@ -1,14 +1,20 @@
 # Trip Atlas
 
-A travel map app for iPhone. Your trips are the home screen; each trip's places sit on a vector map with photos, notes, directions and your live location. Optional accounts sync trips between devices and let you share them.
+A travel map web app that runs in any modern browser: iPhone, Android or a computer. Your trips are the home screen; each trip's places sit on a vector map with photos, notes, directions and your live location. Optional accounts sync trips between devices and let you share them.
 
 Live: https://lucas-ayub.github.io/travel-guide-app/
 
-> **Vibe-coded.** This app was built by describing it in plain language to Claude, Anthropic's AI assistant, which wrote the code, SQL, logo and setup steps. The author tested it on his iPhone and steered it with feedback, but did not write the code by hand. Expect rough edges, and review the code before reusing it. The conversation that built it, prompts and replies, is in [PROMPTS.md](PROMPTS.md).
+> **Vibe-coded.** This app was built by describing it in plain language to Claude, Anthropic's AI assistant, which wrote the code, SQL, logo and setup steps. The author tested it mostly on his iPhone and steered it with feedback, but did not write the code by hand. Expect rough edges, and review the code before reusing it. The conversation that built it, prompts and replies, is in [PROMPTS.md](PROMPTS.md).
 
-## Install on iPhone
+## Use it in a browser, or install it
 
-Open the link in Safari, tap Share → Add to Home Screen, then always open Trip Atlas from its icon. The home screen app and Safari keep separate sign-ins.
+Nothing has to be installed: open the link in any browser and it works. Installing is optional and gives Trip Atlas its own icon and a full-screen window.
+
+- **iPhone** – open the link in Safari, tap Share → Add to Home Screen, then open Trip Atlas from its icon. The home screen app and Safari keep separate sign-ins.
+- **Android** – open the link in Chrome and tap *Install Trip Atlas* in the Account tab, or open the menu (⋮) → *Install app* / *Add to Home screen*.
+- **Computer** – it works in any browser; in Chrome or Edge you can also install it from the icon at the right of the address bar.
+
+First-time visitors see two demo trips, *Demo trip · Paris* and *Demo trip · Rio de Janeiro*, to show how the app works. *Remove demos* on the Trips tab deletes them; demo trips are never added to an account.
 
 After an update, close the app completely and open it again. GitHub Pages can take up to about 10 minutes to serve the new version. The bottom of the Account tab shows which version you have ("Trip Atlas · updated …").
 
@@ -31,6 +37,7 @@ After an update, close the app completely and open it again. GitHub Pages can ta
   Maps, drawings, paintings, black-and-white and archive images are filtered out. In the full-screen viewer you can pick the cover photo or hide a photo.
 - **Accounts and sync** – name, email and password (Supabase). *Keep me signed in* is on by default and keeps you signed in after closing the app; turn it off on a shared device. Your account and trips appear straight away when the app opens, also offline, and changes sync when you are back online.
 - **Sharing** – invite someone by email with *Can edit* or *Can view*; the trip appears in their Trips tab once they sign in with that email.
+- **Back button** – on Android (and with the browser's Back) it closes the top layer first: photo viewer, form, place card, search, list, then back to Trips.
 - **Backup** – export one trip or all trips as a JSON file; import a backup or a Google My Maps .kml.
 
 ## Files
@@ -39,12 +46,14 @@ After an update, close the app completely and open it again. GitHub Pages can ta
 - `config.js` – Supabase project URL and publishable (anon) key; leave both empty to use the app without accounts
 - `setup.sql` – run once in Supabase → SQL Editor to create the trips table
 - `sharing.sql` – run once after `setup.sql` to enable sharing
-- `manifest.webmanifest`, `icon.png`, `icon-512.png`, `logo.svg` – home screen app name, colours and icons
+- `manifest.webmanifest`, `icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `logo.svg` – installed app name, colours and icons (the maskable icon fits Android's round and squircle shapes)
+- `sw.js` – a pass-through service worker, which Chrome needs before it offers to install the app; it caches nothing, so every launch loads the latest version
 - `PROMPTS.md` – the conversation used to vibe-code the app (prompts and replies, in English, with private details removed)
 
 ## Notes
 
 - **Supabase settings** – Authentication → Sign In / Providers → Email: *Confirm email* off. Authentication → URL Configuration: Site URL and Redirect URLs set to the live address above, so password reset links work.
 - **Openverse** allows at most 20 results per search without an API key; asking for more returns 401, so the app asks for 20.
-- **iOS 26 home screen apps** can end the page above the bottom of the screen by about the status bar height. The app measures this when it opens and extends the map, panels and tab bar to the bottom edge.
+- **iOS 26 home screen apps** can end the page above the bottom of the screen by about the status bar height. The app measures this when it opens and extends the map, panels and tab bar to the bottom edge. Android and computers don't need this, so it only runs on iPhone and iPad.
+- **Android browsers** show an address bar that is part of the screen height; panels are sized with `dvh` units so they fit the visible area.
 - Libraries load from jsDelivr: MapLibre GL 4.7.1 and supabase-js 2.49.4.

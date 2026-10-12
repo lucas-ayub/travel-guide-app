@@ -7,7 +7,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trip Atlas">
-<meta name="theme-color" content="#0A1320">
+<meta name="theme-color" content="#F2F4F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A1320" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Trip maps with photos, notes and your live location. Works in any browser on iPhone, Android or a computer.">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
@@ -36,7 +38,7 @@
     --glass:rgba(17,29,44,.82); --scrim:rgba(0,0,0,.6); --shadow:0 12px 32px rgba(0,0,0,.45); --shadow-s:0 2px 10px rgba(0,0,0,.35); color-scheme:dark; }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;margin:0}
+html,body{height:100%;margin:0;overscroll-behavior:none}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);overflow:hidden;overscroll-behavior:none;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -316,6 +318,22 @@ textarea{min-height:84px;resize:vertical}
 .toast.act{pointer-events:auto}
 .toast button{border:0;background:none;color:var(--accent-2);font-weight:700;padding:0 0 0 12px}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+/* Android and desktop browsers: size to the visible screen, which excludes the address bar */
+@supports (height:1dvh){
+  body.sheet-open .maplibregl-ctrl-bottom-right{bottom:calc(var(--tabh) + 50dvh)}
+  body.sheet-open .fabs{bottom:calc(var(--tabh) + 50dvh + 12px - var(--gap,0px))}
+  body.sheet-open .sheet{height:50dvh}
+  body.searching .sheet{height:auto}
+  .hero-photo{height:min(300px,38dvh)}
+  dialog{max-height:calc(100dvh - var(--st) - var(--sb) - 30px)}
+}
+.pill.demo{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.demo-note{background:var(--surface);border-radius:22px;padding:16px 18px;box-shadow:var(--shadow-s);display:flex;flex-direction:column;gap:10px;border-left:4px solid var(--accent)}
+.demo-note b{font:700 17px var(--display)}
+.demo-note p{margin:0;color:var(--muted)}
+.demo-note .row{display:flex;gap:8px;flex-wrap:wrap}
+.demo-note .row .btn{flex:1 1 140px;padding:11px 12px}
+.platforms{display:flex;gap:6px;flex-wrap:wrap}
 </style>
 </head>
 <body data-tab="trips" class="booting">
@@ -374,6 +392,7 @@ textarea{min-height:84px;resize:vertical}
     <div class="brand"><img src="logo.svg" alt=""><b>Trip Atlas</b><span class="grow"></span><button class="avatar" id="hubAvatar" aria-label="Account">?</button></div>
     <p class="boot" id="bootMsg" role="status">Loading your trips…</p>
     <div class="greet"><h1 id="greet">Where to next?</h1><p id="greetSub"></p></div>
+    <div id="demoSlot"></div>
     <div id="heroSlot"></div>
     <section class="stack" id="upSec">
       <div class="sec-h"><h3>Your trips</h3><button id="importBtn2">Import</button></div>
@@ -505,49 +524,82 @@ let tt;function toast(m,act){
   if(act){const b=document.createElement('button');b.textContent=act.label;b.onclick=()=>{clearTimeout(tt);el.classList.remove('show','act');act.fn()};el.appendChild(b)}
   el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show','act'),act?5000:3200)}
 
-/* ================= Seed trip ================= */
+/* ================= Demo trips ================= */
+// What a new visitor sees before planning a trip: two example trips that show how the app works.
 function P(group,name,lat,lon,note,wiki){return{id:uid(),group,name,lat,lon,note:note||'',wiki:wiki||''}}
-function seedTrip(){
-  return {id:uid(),name:'Copenhagen + Malmö',start:'2026-10-24',end:'2026-10-26',updated:Date.now(),
-    groups:[{id:'base',name:'Base & transport',color:'#5B6B7C'},{id:'sat',name:'Sat 24 Oct',color:'#F0452B'},{id:'sun',name:'Sun 25 Oct',color:'#1E9E6A'},{id:'mon',name:'Mon 26 Oct · Malmö',color:'#D99A0B'}],
+const dayISO=n=>{const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+function demoTrips(){
+  return [
+  {id:uid(),demo:true,name:'Demo trip · Paris',start:dayISO(14),end:dayISO(16),updated:Date.now(),
+    groups:[{id:'base',name:'Base & transport',color:'#5B6B7C'},{id:'d1',name:'Day 1 · Classic Paris',color:'#F0452B'},{id:'d2',name:'Day 2 · Museums & islands',color:'#1E9E6A'},{id:'d3',name:'Day 3 · Montmartre & Marais',color:'#D99A0B'}],
     places:[
-      P('base','Hotel',55.6759,12.5690,'Example stay in the city centre. Edit this place to set your own hotel.'),
-      P('base','Copenhagen Airport (CPH)',55.6300,12.6490,'Arrival and departure.','Copenhagen Airport'),
-      P('base','København H',55.6727,12.5647,'Trains to the airport, Malmö and Humlebæk.','Copenhagen Central Station'),
-      P('base','Kødbyen',55.6682,12.5605,'Bars and restaurants near the hotel.','Kødbyen'),
-      P('sat','Ny Carlsberg Glyptotek',55.67298,12.572543,'10:00 · optional. Copenhagen Card. Greek and Roman galleries partly closed in 2026.','Ny Carlsberg Glyptotek'),
-      P('sat','Christiansborg',55.6763218,12.5803274,'11:15. Palace on the Card; tower is free.','Christiansborg Palace'),
-      P('sat','Black Diamond',55.6733994,12.5826588,'12:30. Free, harbour views.','Black Diamond (library)'),
-      P('sat','LEGO Store',55.678546,12.575896,'13:15. On Strøget; lunch nearby.'),
-      P('sat','Old University Library',55.6801391,12.5732044,'14:00. Only open on Saturday on this trip. Small fee.'),
-      P('sat','Rosenborg',55.6858274,12.5772687,'14:45. Show the Card QR at the ticket desk; can sell out in the afternoon.','Rosenborg Castle'),
-      P('sat',"Frederik's Church",55.685078,12.5895549,'16:00. Free, closes at 5 pm.',"Frederik's Church"),
-      P('sat','Amalienborg',55.6840588,12.5930201,'16:30. Palace square.','Amalienborg'),
-      P('sat','Canal Tours (Nyhavn)',55.6805274,12.587945,'16:45. Copenhagen Card. Last departures around 18:30.'),
-      P('sat','Nyhavn',55.679776,12.5913041,'18:00. Lights on after sunset.','Nyhavn'),
-      P('sat','Gasoline Grill',55.683242,12.5851505,'18:45. Open until 10 pm on Saturday.'),
-      P('sat','Tivoli Gardens',55.6736629,12.5682338,'20:00. Halloween season; open until midnight Saturday. Rides extra.','Tivoli Gardens'),
-      P('sun','Designmuseum Danmark',55.6864299,12.5936135,'10:00. Copenhagen Card.','Designmuseum Danmark'),
-      P('sun','Kastellet',55.691376,12.594301,'11:00. Star-shaped fortress.','Kastellet, Copenhagen'),
-      P('sun','The Little Mermaid',55.69286,12.5992828,'11:30. Then bus from Østerport.','The Little Mermaid (statue)'),
-      P('sun','Grundtvig’s Church',55.7166277,12.534012,'12:30. Sunday 12:30–15:45. Closed Sat and Mon.',"Grundtvig's Church"),
-      P('sun','Louisiana Museum',55.969549,12.542784,'14:30–18:00. Train to Humlebæk, covered by the Card.','Louisiana Museum of Modern Art'),
-      P('sun','Christianshavn Canal',55.6755541,12.5926294,'19:30. Dinner by the canal.','Christianshavn Canal'),
-      P('mon','Malmö Central Station',55.6090669,12.9999228,'09:40. Luggage lockers. Bring your passport.','Malmö Central Station'),
-      P('mon','St. Peter’s Church',55.6069369,13.0033475,'10:00. Free.',"St. Peter's Church, Malmö"),
-      P('mon','Stortorget',55.6060,13.0011,'Main square.','Stortorget, Malmö'),
-      P('mon','Lilla Torg',55.6051846,12.9988061,'10:45. Half-timbered houses; fika.','Lilla torg'),
-      P('mon','Malmö Castle',55.6049011,12.9875581,'11:45. Closed Mondays; see the outside and the parks.','Malmö Castle'),
-      P('mon','Ribersborgs Kallbadhus',55.604893,12.9657333,'12:30. Sauna on the pier, open Mondays. Bring a towel.'),
-      P('mon','Turning Torso',55.6133242,12.976362,'14:30. Train to the airport at 15:45 (22 min).','Turning Torso'),
-      P('mon','Möllevångstorget',55.5918121,13.0086553,'Optional. Cheap food.','Möllevångstorget')
-    ]};
+      P('base','Hotel',48.8590,2.3600,'Example stay in Le Marais. Edit this place to set your own hotel.'),
+      P('base','Charles de Gaulle Airport',49.0097,2.5479,'Arrival and departure. RER B to the city centre.','Charles de Gaulle Airport'),
+      P('base','Gare du Nord',48.8809,2.3553,'Trains to the airport and beyond.','Gare du Nord'),
+      P('d1','Eiffel Tower',48.85837,2.29448,'Morning. Book the summit online.','Eiffel Tower'),
+      P('d1','Trocadéro',48.8616,2.2893,'The classic view of the tower.','Trocadéro'),
+      P('d1','Arc de Triomphe',48.87378,2.29504,'Climb the roof terrace for the avenues.','Arc de Triomphe'),
+      P('d1','Champs-Élysées',48.8698,2.3075,'Walk down towards Concorde.','Champs-Élysées'),
+      P('d1','Seine river cruise',48.8637,2.3060,'Evening boat from Pont de l’Alma.','Bateaux Mouches'),
+      P('d2','Louvre',48.86061,2.33764,'Morning. Timed ticket; enter by the pyramid or the Carrousel.','Louvre'),
+      P('d2','Tuileries Garden',48.8635,2.3275,'Picnic between the museums.','Tuileries Garden'),
+      P('d2','Musée d’Orsay',48.86,2.32656,'Afternoon. Impressionists on the top floor.',"Musée d'Orsay"),
+      P('d2','Sainte-Chapelle',48.85544,2.34501,'Stained glass; best on a sunny day.','Sainte-Chapelle'),
+      P('d2','Notre-Dame',48.85297,2.34996,'Free entry; queues move fast.','Notre-Dame de Paris'),
+      P('d2','Shakespeare and Company',48.85257,2.34714,'Bookshop facing Notre-Dame.','Shakespeare and Company (bookstore)'),
+      P('d3','Sacré-Cœur',48.88672,2.34306,'Morning, before the crowds. Free.','Sacré-Cœur, Paris'),
+      P('d3','Place du Tertre',48.8865,2.3408,'Painters’ square in Montmartre.','Place du Tertre'),
+      P('d3','Place des Vosges',48.8556,2.3655,'Oldest planned square in Paris.','Place des Vosges'),
+      P('d3','Musée Picasso',48.8598,2.3624,'Optional. In a Marais mansion.','Musée Picasso'),
+      P('d3','Jardin du Luxembourg',48.84622,2.33718,'Sunset walk on the Left Bank.','Jardin du Luxembourg'),
+      P('d3','Panthéon',48.84622,2.346,'Next to the gardens.','Panthéon')
+    ]},
+  {id:uid(),demo:true,name:'Demo trip · Rio de Janeiro',start:dayISO(45),end:dayISO(48),updated:Date.now(),
+    groups:[{id:'base',name:'Base & transport',color:'#5B6B7C'},{id:'d1',name:'Day 1 · Beaches',color:'#F0452B'},{id:'d2',name:'Day 2 · Christ & Sugarloaf',color:'#1E9E6A'},{id:'d3',name:'Day 3 · Centro & Lapa',color:'#D99A0B'},{id:'d4',name:'Day 4 · Gardens & lagoon',color:'#7A5AF8'}],
+    places:[
+      P('base','Hotel',-22.9680,-43.1800,'Example stay in Copacabana. Edit this place to set your own hotel.'),
+      P('base','Galeão Airport',-22.8090,-43.2506,'International arrivals.','Rio de Janeiro/Galeão International Airport'),
+      P('base','Santos Dumont Airport',-22.9105,-43.1631,'Domestic flights, next to the centre.','Santos Dumont Airport'),
+      P('d1','Copacabana Beach',-22.9711,-43.1823,'Morning walk on the wave pavement.','Copacabana Beach'),
+      P('d1','Fort Copacabana',-22.9862,-43.1874,'Café with a view down the beach.','Fort Copacabana'),
+      P('d1','Arpoador',-22.9893,-43.191,'Sunset from the rock; locals clap.','Arpoador'),
+      P('d1','Ipanema Beach',-22.9866,-43.2045,'Afternoon swim near Posto 9.','Ipanema'),
+      P('d2','Christ the Redeemer',-22.95192,-43.21049,'Early. Cog train from Cosme Velho; buy tickets ahead.','Christ the Redeemer (statue)'),
+      P('d2','Parque Lage',-22.9604,-43.2117,'Mansion courtyard café under the mountain.','Parque Lage'),
+      P('d2','Sugarloaf cable car',-22.955,-43.165,'Late afternoon. Two cable cars from Praia Vermelha.','Sugarloaf Cable Car'),
+      P('d2','Sugarloaf Mountain',-22.9486,-43.1566,'Stay for sunset over the bay.','Sugarloaf Mountain'),
+      P('d2','Mureta da Urca',-22.9445,-43.163,'Drinks on the sea wall after dark.','Urca'),
+      P('d3','Museum of Tomorrow',-22.89412,-43.17955,'Morning. Science museum on the waterfront.','Museum of Tomorrow'),
+      P('d3','Confeitaria Colombo',-22.9054,-43.1785,'Coffee in a belle époque tearoom.','Confeitaria Colombo'),
+      P('d3','Real Gabinete Português de Leitura',-22.9054,-43.1823,'Free. Library with a stained-glass ceiling.','Real Gabinete Português de Leitura'),
+      P('d3','Theatro Municipal',-22.909,-43.1765,'Guided tours on most days.','Theatro Municipal (Rio de Janeiro)'),
+      P('d3','Selarón Steps',-22.9154,-43.1791,'Tiled staircase between Lapa and Santa Teresa.','Selarón Steps'),
+      P('d3','Lapa Arches',-22.913,-43.1801,'Samba bars around the arches at night.','Carioca Aqueduct'),
+      P('d4','Botanical Garden',-22.9671,-43.2246,'Morning. Avenue of royal palms.','Rio de Janeiro Botanical Garden'),
+      P('d4','Rodrigo de Freitas Lagoon',-22.974,-43.212,'Bike or walk the lagoon path.','Rodrigo de Freitas Lagoon'),
+      P('d4','Maracanã',-22.9121,-43.2302,'Optional. Stadium tour, or a match.','Maracanã Stadium')
+    ]}
+  ];
 }
+// Before the demo trips, new visitors got the author's Copenhagen trip. Swap it out on devices that still have it.
+const isOldSeed=t=>t.name==='Copenhagen + Malmö'&&(t.places||[]).some(p=>String(p.note||'').startsWith('Example stay in the city centre'));
 function blankTrip(name,start,end){return{id:uid(),name,start:start||'',end:end||'',updated:Date.now(),groups:[{id:uid(),name:'Day 1',color:PAL[0]}],places:[]}}
+
+/* ================= Platform ================= */
+// Trip Atlas is a web app: it runs in any browser, and can be installed on iPhone, Android and computers.
+const IS_IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const IS_ANDROID=/Android/i.test(navigator.userAgent);
+const standaloneNow=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+let installEvt=null;   // Chrome and Edge (Android and computers) hand over their install prompt here
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(tab==='account')renderAccount()});
+addEventListener('appinstalled',()=>{installEvt=null;toast('Trip Atlas installed');if(tab==='account')renderAccount()});
+// Chrome only offers its install prompt to pages with a service worker. This one only passes pages through, never caches.
+if('serviceWorker' in navigator&&!IS_IOS&&(location.protocol==='https:'||location.hostname==='localhost'))
+  addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 
 /* ================= State ================= */
 const CFG=window.ATLAS_CONFIG||{};
-const BUILD='9 Oct 2026, 22:05';
+const BUILD='12 Oct 2026, 12:34';
 const HAS_AUTH=!!(CFG.supabaseUrl&&CFG.supabaseAnonKey);
 /* Where the sign-in lives. "Keep me signed in" on: localStorage, which survives closing the app.
    Off: sessionStorage, which the phone clears when the app is closed. */
@@ -598,7 +650,10 @@ function loadGuest(){
   if(!s){
     const old=load('roteiros.v1');
     if(old&&Array.isArray(old.trips)&&old.trips.length){ s={trips:old.trips,current:old.current,prefs:{}}; }
-    else { const t=seedTrip(); s={trips:[t],current:t.id,prefs:{}}; }
+    else { const ts=demoTrips(); s={trips:ts,current:ts[0].id,prefs:{}}; }
+  } else if((s.trips||[]).some(isOldSeed)){
+    s.trips=s.trips.filter(t=>!isOldSeed(t));
+    if(!s.trips.length){s.trips=demoTrips();s.current=s.trips[0].id}
   }
   return s;
 }
@@ -715,7 +770,7 @@ function startLocate(){
     else meMarker.setLngLat([me.lon,me.lat]);
     if(firstFix){firstFix=false;map.easeTo({center:[me.lon,me.lat],zoom:15})}
     $('#locBtn').classList.add('live'); renderList(true);
-  },err=>{watchId=null;toast(err.code===1?'Location is off. Turn it on in Settings › Privacy & Security › Location Services › Safari Websites.':'Could not get your location right now.')},{enableHighAccuracy:true,maximumAge:15000,timeout:20000});
+  },err=>{watchId=null;toast(err.code===1?(IS_IOS?'Location is off. Turn it on in Settings › Privacy & Security › Location Services › Safari Websites.':IS_ANDROID?'Location is blocked. Allow it for this site (tap the icon left of the address › Permissions), and check that Location is on in Android settings.':'Location is blocked. Allow it for this site in your browser’s site settings.'):'Could not get your location right now.')},{enableHighAccuracy:true,maximumAge:15000,timeout:20000});
 }
 function dist(p){
   if(!me) return '';
@@ -733,7 +788,7 @@ async function q(base,params,tries=3){
     catch(e){if(i>=tries-1)throw e;await new Promise(res=>setTimeout(res,600*(i+1)+Math.random()*400))}
   }
 }
-const norm=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!['the','and','church','copenhagen','malmo','museum'].includes(w));
+const norm=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!['the','and','church','museum','paris','rio','janeiro'].includes(w));
 const similar=(a,b)=>{const B=new Set(norm(b));return norm(a).filter(w=>B.has(w)).length};
 const km=(a,b,c,d)=>{const r=x=>x*Math.PI/180,x=(r(d)-r(b))*Math.cos(r((a+c)/2)),y=r(c)-r(a);return Math.sqrt(x*x+y*y)*6371};
 async function wpPage(title){
@@ -935,7 +990,7 @@ function tripCard(t){
   const st=status(t),cv=coverOf(t),v=t.places.filter(p=>p.visited).length;
   return `<div class="tcard" data-open="${t.id}" role="button" tabindex="0">
     <div class="cv" style="${cv?`background-image:url('${esc(cv)}')`:''}"></div>
-    <div class="meta"><b>${esc(t.name)}</b><span class="sub">${esc(fmtRange(t)||'No dates yet')}</span>
+    <div class="meta"><b>${esc(t.name)}</b><span class="sub">${t.demo?'<span class="pill demo">Demo</span> ':''}${esc(fmtRange(t)||'No dates yet')}</span>
       <span class="sub">${t.places.length} ${t.places.length===1?'place':'places'}${v?` · ${v} visited`:''}${st?` · <span class="pill ${st.kind}">${st.label}</span>`:''}</span>
       ${roleOf(t)!=='owner'?`<span class="sub"><span class="pill shared">Shared by ${esc((t.ownerName||t.ownerEmail||'someone').split(' ')[0])}</span></span>`:(S.members?.[t.id]?.length?`<span class="sub"><span class="pill shared">Shared with ${S.members[t.id].length}</span></span>`:'')}</div>
     <button class="more" data-edit="${t.id}" aria-label="Trip settings">${ICON.more}</button></div>`;
@@ -957,6 +1012,10 @@ function renderHub(){
       </div></button>`;
     heroT.places.slice(0,4).forEach(ensureInfo);
   } else $('#heroSlot').innerHTML=`<div class="empty-hub"><img src="logo.svg" alt=""><h2>${user?'Your atlas is empty':'No trips yet'}</h2><p>Plan a trip, add the places you want to see, and they will show up here and on the map.</p><button class="btn primary" data-new>Plan your first trip</button></div>`;
+  const demos=all.filter(t=>t.demo);
+  $('#demoSlot').innerHTML=demos.length?`<div class="demo-note"><b>${demos.length===1?'This is a demo trip':'These are demo trips'}</b>
+    <p>${esc(demos.map(t=>t.name.replace(/^Demo trip · /,'')).join(' and '))} ${demos.length===1?'is an example':'are examples'} to show how Trip Atlas works: open one to see the map, the photos and the day plan, search the places or mark them as visited. Trip Atlas runs in any browser, on iPhone, Android or a computer.</p>
+    <div class="row"><button class="btn primary" data-new>Plan your own trip</button><button class="btn" data-demo-off>Remove demos</button></div></div>`:'';
   $('#upSec').hidden=!all.length;
   $('#tripCards').innerHTML=act.filter(t=>t!==heroT).map(tripCard).join('');
   $('#pastSec').hidden=!past.filter(t=>t!==heroT).length;
@@ -965,6 +1024,9 @@ function renderHub(){
 }
 $('#view-trips').addEventListener('click',e=>{
   if(e.target.closest('[data-new]')){openTripForm(null);return}
+  if(e.target.closest('[data-demo-off]')){const gone=S.trips.filter(t=>t.demo),cur=S.current;S.trips=S.trips.filter(t=>!t.demo);
+    if(!S.trips.find(t=>t.id===S.current))S.current=S.trips[0]?.id||null;save();renderAll();
+    toast(`Removed ${gone.length} demo ${gone.length===1?'trip':'trips'}`,{label:'Undo',fn:()=>{S.trips.push(...gone);S.current=cur;save();renderAll()}});return}
   const ed=e.target.closest('[data-edit]'); if(ed){e.stopPropagation();openTripForm(S.trips.find(t=>t.id===ed.dataset.edit));return}
   const op=e.target.closest('[data-open]'); if(op){openTrip(op.dataset.open)}
 });
@@ -1007,7 +1069,7 @@ function renderList(onlyDist){
   ul.innerHTML=html; ps.forEach(ensureInfo);
 }
 $('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;filter=b.dataset.g;$('#list').scrollTop=0;if(query)endSearch(true);renderTripUI();fitAll()};
-$('#sheetHead').onclick=()=>{const open=document.body.classList.toggle('sheet-open');if(!open)endSearch()};
+$('#sheetHead').onclick=()=>{const open=document.body.classList.toggle('sheet-open');if(open)pushLayer();else endSearch()};
 function setQuery(v){
   query=v;$('#placeQx').hidden=!v;$('#list').scrollTop=0;
   document.body.classList.toggle('searching',!!v||document.activeElement===$('#placeQ'));
@@ -1018,14 +1080,14 @@ function endSearch(quiet){
   if(query||!quiet){query='';$('#placeQx').hidden=true;if(!quiet){renderMarkers();renderList()}}
 }
 $('#placeQ').addEventListener('input',e=>setQuery(e.target.value));
-$('#placeQ').addEventListener('focus',()=>document.body.classList.add('sheet-open','searching'));
+$('#placeQ').addEventListener('focus',()=>{if(!document.body.classList.contains('searching'))pushLayer();document.body.classList.add('sheet-open','searching')});
 $('#placeQ').addEventListener('blur',()=>{if(!query.trim())document.body.classList.remove('searching')});
 $('#placeQ').addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();const ps=visiblePlaces();if(qWords().length&&ps.length===1){$('#placeQ').blur();openDetail(ps[0].id)}else $('#placeQ').blur()}
   if(e.key==='Escape')endSearch()});
 $('#placeQx').onclick=()=>{$('#placeQ').value='';setQuery('');$('#placeQ').focus()};
 $('#placeQcancel').onclick=()=>endSearch();
-$('#searchBtn').onclick=()=>{document.body.classList.add('sheet-open','searching');$('#placeQ').focus()};
+$('#searchBtn').onclick=()=>{const c=document.body.classList;if(!c.contains('searching')){if(!c.contains('sheet-open'))pushLayer();pushLayer()}document.body.classList.add('sheet-open','searching');$('#placeQ').focus()};
 $('#list').onclick=e=>{
   const li=e.target.closest('.item'),tk=e.target.closest('[data-visit]');
   if(tk){const p=trip()?.places.find(x=>x.id===tk.dataset.visit);if(!p||li?.classList.contains('leaving'))return;
@@ -1042,6 +1104,7 @@ $('#tripHead').onclick=()=>{const t=trip();if(t)openTripForm(t);else openTripFor
 /* ================= Place card ================= */
 function openDetail(id){
   const t=trip(),p=t?.places.find(x=>x.id===id);if(!p)return;
+  if(!$('#detail').classList.contains('show'))pushLayer();
   selected=id;renderMarkers();renderDetail(p);
   $('#detail').classList.add('show');$('#detail').setAttribute('aria-hidden','false');$('#detailScroll').scrollTop=0;
   map?.easeTo({center:[p.lon,p.lat],zoom:Math.max(map.getZoom(),15),offset:[0,-innerHeight*0.3],duration:600});
@@ -1082,6 +1145,7 @@ function openViewer(photos,i,place){
   lbPhotos=photos;lbPlace=place;const s=$('#lbStrip');
   $('#lbActions').hidden=!canEdit(trip());
   s.innerHTML=photos.map(ph=>`<div class="lb-slide"><img src="${esc(ph.src)}" alt="${esc(place.name)}" draggable="false"></div>`).join('');
+  if($('#lb').hidden)pushLayer();
   $('#lb').hidden=false;s.classList.remove('locked');
   requestAnimationFrame(()=>{s.scrollLeft=i*s.clientWidth;lbInfo(i)});
 }
@@ -1358,7 +1422,7 @@ function renderAccount(){
     const next=sortedTrips().find(t=>['up','now'].includes(status(t)?.kind));
     const since=user.since?new Date(user.since).toLocaleDateString('en-GB',{month:'long',year:'numeric'}):'';
     const guest=load(keyFor(null)); const own=new Set(S.trips.map(t=>t.id));
-    const fromDevice=(guest?.trips||[]).filter(t=>!own.has(t.id));
+    const fromDevice=(guest?.trips||[]).filter(t=>!own.has(t.id)&&!t.demo);
     html+=`<div class="card">
       <div class="profile"><span class="avatar" style="--av:${avColor(user.email)}">${esc(initial(user))}</span>
         <div><b>${esc(user.name||'Traveller')}</b><span>${esc(user.email)}</span>${since?`<span style="display:block">Member since ${esc(since)}</span>`:''}</div></div>
@@ -1368,11 +1432,12 @@ function renderAccount(){
       ${syncLine()}
       ${remSwitch('aKeep',remembering(),remembering()?'You stay signed in on this device, even after closing the app.':'You will be signed out when you close the app.')}
       <div class="grid-btns"><button class="btn" id="aSync">Sync now</button><button class="btn danger" id="aOut">Sign out</button></div></div>
-    ${fromDevice.length?`<div class="card"><h3>Trips on this device</h3><p>${fromDevice.length} ${fromDevice.length===1?'trip was':'trips were'} saved on this phone before you signed in: ${esc(fromDevice.map(t=>t.name).join(', '))}. They stay separate unless you add them.</p><button class="btn primary" id="aAdopt">Add to my account</button></div>`:''}
+    ${fromDevice.length?`<div class="card"><h3>Trips on this device</h3><p>${fromDevice.length} ${fromDevice.length===1?'trip was':'trips were'} saved on this device before you signed in: ${esc(fromDevice.map(t=>t.name).join(', '))}. They stay separate unless you add them.</p><button class="btn primary" id="aAdopt">Add to my account</button></div>`:''}
     <div class="card"><h3>Profile</h3><label class="f">Display name<input type="text" id="aRename" value="${esc(user.name)}" placeholder="Your name"></label></div>`;
   }
   const ms=S.prefs.mapStyle||'auto';
-  html+=`<div class="card"><h3>Map style</h3><div class="seg" id="styleSeg">${[['auto','Auto'],['liberty','Liberty'],['bright','Bright'],['positron','Light'],['dark','Dark']].map(([k,l])=>`<button data-s="${k}" aria-pressed="${ms===k}">${l}</button>`).join('')}</div><p class="hint">Auto follows your phone's light or dark mode.</p></div>
+  html+=installCard();
+  html+=`<div class="card"><h3>Map style</h3><div class="seg" id="styleSeg">${[['auto','Auto'],['liberty','Liberty'],['bright','Bright'],['positron','Light'],['dark','Dark']].map(([k,l])=>`<button data-s="${k}" aria-pressed="${ms===k}">${l}</button>`).join('')}</div><p class="hint">Auto follows your device’s light or dark mode.</p></div>
     <div class="card"><h3>Backup</h3><p>Export all trips as a file, or import a backup or a Google My Maps .kml.</p>
       <div class="grid-btns"><button class="btn" id="aExport">Export all</button><button class="btn" id="aImport">Import</button></div></div>
     <p class="foot">Trip Atlas · updated ${BUILD}</p>`;
@@ -1383,7 +1448,7 @@ function renderAccount(){
     const email=$('#aEmail').value.trim();if(!email){authErr='Type your email above first.';authOk='';renderAccount();return}
     authEmail=email;authBusy=true;renderAccount();
     const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
-    authBusy=false;authErr=error?error.message:'';authOk=error?'':`We sent a reset link to ${email}. Open it in Safari on this phone to choose a new password.`;renderAccount()});
+    authBusy=false;authErr=error?error.message:'';authOk=error?'':`We sent a reset link to ${email}. Open it on this device to choose a new password.`;renderAccount()});
   $('#newPassForm')?.addEventListener('submit',async e=>{e.preventDefault();const pw=$('#aNewPass').value;
     if(pw.length<6){authErr='Use at least 6 characters.';renderAccount();return}
     const{error}=await sb.auth.updateUser({password:pw});if(error){authErr=error.message;renderAccount();return}
@@ -1398,7 +1463,8 @@ function renderAccount(){
   $('#aRemember')?.addEventListener('change',e=>{rememberPick=e.target.checked});
   $('#aKeep')?.addEventListener('change',e=>{setRemember(e.target.checked);renderAccount();toast(e.target.checked?'You’ll stay signed in on this device':'You’ll be signed out when you close the app')});
   document.querySelector('[data-next]')?.addEventListener('click',e=>openTrip(e.currentTarget.dataset.next));
-  $('#aAdopt')&&($('#aAdopt').onclick=()=>{const guest=load(keyFor(null)),own=new Set(S.trips.map(t=>t.id));const add=(guest?.trips||[]).filter(t=>!own.has(t.id)).map(t=>normTrip({...t}));add.forEach(t=>{S.trips.push(t);touch(t)});if(!S.current&&add[0])S.current=add[0].id;save();renderAll();renderAccount();toast(`Added ${add.length} ${add.length===1?'trip':'trips'} to your account`)});
+  $('#aInstall')&&($('#aInstall').onclick=async()=>{const e=installEvt;if(!e)return;installEvt=null;e.prompt();try{await e.userChoice}catch(err){}renderAccount()});
+  $('#aAdopt')&&($('#aAdopt').onclick=()=>{const guest=load(keyFor(null)),own=new Set(S.trips.map(t=>t.id));const add=(guest?.trips||[]).filter(t=>!own.has(t.id)&&!t.demo).map(t=>normTrip({...t}));add.forEach(t=>{S.trips.push(t);touch(t)});if(!S.current&&add[0])S.current=add[0].id;save();renderAll();renderAccount();toast(`Added ${add.length} ${add.length===1?'trip':'trips'} to your account`)});
   sb&&$('#aRename')&&($('#aRename').onchange=async e=>{const n=e.target.value.trim();const{error}=await sb.auth.updateUser({data:{name:n}});if(!error){user.name=n;toast('Name saved');renderHub();renderAccount()}});
   $('#styleSeg').onclick=e=>{const b=e.target.closest('[data-s]');if(!b)return;S.prefs.mapStyle=b.dataset.s;save();applyStyle();renderAccount()};
   $('#aExport').onclick=()=>exportFile(null,'trip-atlas-backup');
@@ -1427,8 +1493,19 @@ async function submitAuth(e){
   toast(`Signed in as ${authEmail}`);
 }
 
+function installCard(){
+  const where=`<div class="platforms"><span class="pill">iPhone</span><span class="pill">Android</span><span class="pill">Computer</span></div>`;
+  if(standaloneNow()) return `<div class="card"><h3>Any device, any browser</h3>${where}<p>You’re using the installed app. Trip Atlas also runs in any browser, with the same account and trips.</p></div>`;
+  const how=installEvt?`<button class="btn primary" id="aInstall">Install Trip Atlas</button>`
+    :IS_IOS?`<p class="hint">To install: in Safari, tap Share › Add to Home Screen, then open Trip Atlas from its icon. The installed app keeps its own sign-in.</p>`
+    :IS_ANDROID?`<p class="hint">To install: open the browser menu (⋮) and choose Install app or Add to Home screen.</p>`
+    :`<p class="hint">To install on a computer: in Chrome or Edge, use the install icon at the right of the address bar.</p>`;
+  return `<div class="card"><h3>Any device, any browser</h3>${where}<p>Trip Atlas works right here in your browser. Installing it is optional: it adds an icon and opens full screen.</p>${how}</div>`;
+}
+
 /* ================= Tabs & boot ================= */
 function setTab(t){
+  if(tab==='trips'&&t!=='trips')pushLayer();
   tab=t;document.body.dataset.tab=t;
   document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
   if(t!=='map')closeDetail();
@@ -1437,6 +1514,25 @@ function setTab(t){
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='map'&&tab==='map'){fitAll();return}setTab(b.dataset.tab)});
 $('#hubAvatar').onclick=()=>setTab('account');
+
+/* ================= Back button ================= */
+// Android's back button (and the browser's Back) closes the top layer instead of leaving the app:
+// photo viewer, form, place card, search, list, then back to Trips.
+function pushLayer(){try{history.pushState({atlas:(history.state?.atlas||0)+1},'')}catch(e){}}
+const showModal=HTMLDialogElement.prototype.showModal;
+HTMLDialogElement.prototype.showModal=function(){if(!this.open)pushLayer();return showModal.call(this)};
+function closeTopLayer(){
+  if(!$('#lb').hidden){$('#lbClose').click();return true}
+  const d=[...document.querySelectorAll('dialog[open]')].pop();if(d){d.close();return true}
+  if($('#detail').classList.contains('show')){closeDetail();return true}
+  if(query||document.body.classList.contains('searching')){endSearch();return true}
+  if(document.body.classList.contains('sheet-open')){document.body.classList.remove('sheet-open');return true}
+  if(tab!=='trips'){setTab('trips');return true}
+  return false;
+}
+// An entry whose layer was already closed some other way is skipped, so one press always does something.
+addEventListener('popstate',e=>{if(!closeTopLayer()&&(e.state?.atlas||0)>0)history.back()});
+if(!history.state)try{history.replaceState({atlas:0},'')}catch(e){}
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 function renderAll(){renderHub();renderTripUI();if(tab==='account')renderAccount()}
@@ -1454,7 +1550,7 @@ function fitViewport(){
   const full=innerWidth>innerHeight?Math.min(screen.width,screen.height):Math.max(screen.width,screen.height);
   const d=Math.round(full-h);
   let g=vpGap;
-  if(!standalone||d<=1)g=0;
+  if(!IS_IOS||!standalone||d<=1)g=0;   // Android and computers size the page correctly
   else if(d<=top+8)g=d;            // anything bigger is the keyboard or a split-screen window: leave it
   if(g!==vpGap){vpGap=g;document.documentElement.style.setProperty('--gap',g+'px');map?.resize()}
 }
