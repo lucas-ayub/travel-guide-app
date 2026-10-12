@@ -582,7 +582,7 @@ function demoTrips(){
   ];
 }
 // Before the demo trips, new visitors got the author's Copenhagen trip. Swap it out on devices that still have it.
-const isOldSeed=t=>t.name==='Copenhagen + Malmö'&&(t.places||[]).some(p=>String(p.note||'').startsWith('Example stay in the city centre'));
+const isOldSeed=t=>t.name==='Copenhagen + Malmö'&&(t.places||[]).some(p=>p.name==='København H'&&String(p.note||'').startsWith('Trains to the airport, Malmö'));
 function blankTrip(name,start,end){return{id:uid(),name,start:start||'',end:end||'',updated:Date.now(),groups:[{id:uid(),name:'Day 1',color:PAL[0]}],places:[]}}
 
 /* ================= Platform ================= */
@@ -599,7 +599,7 @@ if('serviceWorker' in navigator&&!IS_IOS&&(location.protocol==='https:'||locatio
 
 /* ================= State ================= */
 const CFG=window.ATLAS_CONFIG||{};
-const BUILD='12 Oct 2026, 12:34';
+const BUILD='12 Oct 2026, 12:50';
 const HAS_AUTH=!!(CFG.supabaseUrl&&CFG.supabaseAnonKey);
 /* Where the sign-in lives. "Keep me signed in" on: localStorage, which survives closing the app.
    Off: sessionStorage, which the phone clears when the app is closed. */
@@ -652,6 +652,7 @@ function loadGuest(){
     if(old&&Array.isArray(old.trips)&&old.trips.length){ s={trips:old.trips,current:old.current,prefs:{}}; }
     else { const ts=demoTrips(); s={trips:ts,current:ts[0].id,prefs:{}}; }
   } else if((s.trips||[]).some(isOldSeed)){
+    try{localStorage.setItem('atlas.oldSeed.backup',JSON.stringify(s.trips.filter(isOldSeed)))}catch(e){}   // kept on the device, just in case
     s.trips=s.trips.filter(t=>!isOldSeed(t));
     if(!s.trips.length){s.trips=demoTrips();s.current=s.trips[0].id}
   }
