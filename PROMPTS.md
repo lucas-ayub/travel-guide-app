@@ -226,3 +226,29 @@ Replaced the hotel in the example trip with a generic "Hotel" in the city centre
 
 **Claude**
 Rewrote this file as a conversation: each prompt with a short summary of the reply, private details removed, and the trip changed to Venice.
+
+## 8. Living with it on the iPhone
+
+**Prompt**
+> I want the app to look good. See how there are black bars at the bottom? Also, I want my login saved: I signed in, but when I close the app and open it again it doesn't remember me. Please add an option to save the login when signing in the first time.
+
+**Claude**
+Traced the black bar to an iOS 26 bug in home screen apps: the page ends above the bottom of the screen by about the status bar height. The app now measures the gap when it opens and stretches the map, panels and tab bar to the edge. Added *Keep me signed in* (on by default) to the sign-in screen and the Account tab. The account and trips now appear as soon as the app opens, even offline, instead of a guest screen while the server answers; the email is prefilled when signing in again. Mentioned that traveller photos had stopped loading.
+
+**Prompt**
+> I'd like to mark the places I've already been to during the trip as visited, so they go to an "already visited" tab or something like that and stop showing up. Please keep the good photo sources, the photos were really nice. And remember to always update the README when you update the app.
+
+**Claude**
+Added a round tick next to each place in the list and *Mark as visited* on its card. Visited places leave the map and the list and move to a *Visited* chip, with the day and time they were marked; *Undo* brings them back, and the state syncs across devices. Found why traveller photos had stopped: Openverse now rejects searches asking for more than 20 results without a key, so the app asks for 20 and the photo order is unchanged. Rewrote the README to describe the whole app.
+
+**Prompt**
+> Add a search bar for the places.
+
+**Claude**
+Added a magnifier at the top of the Map tab and a search field at the top of the place list. It filters the trip's places as you type, looking at names, notes, groups and Wikipedia titles, ignoring accents and case ("rialto" finds Ponte di Rialto). Every word must match and the matching text is highlighted. Visited places are included, the map shows only the matching pins, and tapping a result opens its card. *Cancel*, closing the list or switching trips ends the search. Adding new places is still the **+** button.
+
+**Prompt**
+> You added the search bar for the places, update PROMPTS.md. And from now on, every time you add a new feature to the app, update the prompt history too.
+
+**Claude**
+Added this section with the last three changes and will keep the file up to date with each new feature.
