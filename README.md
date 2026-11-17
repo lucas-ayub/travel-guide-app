@@ -5,6 +5,8 @@
   </picture>
 </p>
 
+<p align="center"><b>🇺🇸 English</b> · <a href="README.pt-BR.md">🇧🇷 Português</a></p>
+
 <p align="center">
   <a href="https://lucas-ayub.github.io/travel-guide-app/"><b>▶ Open the app</b></a>
   &nbsp;·&nbsp; <a href="#-see-it-in-action">In action</a>
